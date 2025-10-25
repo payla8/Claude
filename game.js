@@ -1,0 +1,1450 @@
+// ==================== GAME CONFIGURATION ====================
+const TILE_SIZE = 32;
+const PLAYER_SPEED = 3;
+
+// ==================== GAME STATE ====================
+const gameState = {
+    currentRoom: 'entrance',
+    inventory: [],
+    clues: [],
+    flags: {},
+    objectives: [],
+    dialogQueue: [],
+    player: {
+        x: 400,
+        y: 300,
+        direction: 'down',
+        animFrame: 0,
+        animTimer: 0
+    }
+};
+
+// ==================== CANVAS SETUP ====================
+const canvas = document.getElementById('game-canvas');
+const ctx = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+// ==================== INPUT HANDLING ====================
+const keys = {};
+let interactPressed = false;
+
+document.addEventListener('keydown', (e) => {
+    keys[e.key.toLowerCase()] = true;
+
+    if (e.key.toLowerCase() === 'e') {
+        if (!interactPressed) {
+            interactPressed = true;
+            handleInteraction();
+        }
+    }
+});
+
+document.addEventListener('keyup', (e) => {
+    keys[e.key.toLowerCase()] = false;
+    if (e.key.toLowerCase() === 'e') {
+        interactPressed = false;
+    }
+});
+
+// ==================== ROOM DEFINITIONS ====================
+const rooms = {
+    entrance: {
+        name: 'Wejście do Salonu',
+        width: 800,
+        height: 600,
+        backgroundColor: '#2d2d44',
+        floorColor: '#3d3d5d',
+        objects: [
+            {
+                id: 'reception_desk',
+                type: 'desk',
+                x: 300,
+                y: 100,
+                width: 200,
+                height: 80,
+                color: '#4a3728',
+                name: 'Recepcja',
+                interactive: true,
+                examined: false,
+                description: 'Stara recepcja pokryta kurzem. Leży tu otwarty terminarz.',
+                onExamine: function() {
+                    if (!this.examined) {
+                        this.examined = true;
+                        addClue('appointment_book', 'Terminarz', 'Ostatni wpis: "Natalia - 18:00 - paznokcie żelowe". Data sprzed miesiąca.');
+                        showNotification('Znaleziono: Terminarz z ostatnim wpisem!');
+                        addObjective('Sprawdź pokój manicure', false);
+                    }
+                    return this.description;
+                }
+            },
+            {
+                id: 'magazine_rack',
+                type: 'furniture',
+                x: 100,
+                y: 200,
+                width: 60,
+                height: 60,
+                color: '#5d4e37',
+                name: 'Stojak z magazynami',
+                interactive: true,
+                examined: false,
+                description: 'Stare magazyny o modzie i urodzie. Większość z 2023 roku.',
+                onExamine: function() {
+                    if (!this.examined) {
+                        this.examined = true;
+                        addClue('magazines', 'Magazyny', 'Pomiędzy magazynami znalazłeś skrawek papieru z numerem telefonu i imieniem "Ola".');
+                    }
+                    return this.description;
+                }
+            },
+            {
+                id: 'waiting_sofa',
+                type: 'furniture',
+                x: 100,
+                y: 350,
+                width: 150,
+                height: 80,
+                color: '#6b4c7a',
+                name: 'Sofa',
+                interactive: true,
+                examined: false,
+                description: 'Fioletowa sofa dla oczekujących klientów. Trochę wystrzępiona.',
+                onExamine: function() {
+                    if (!this.examined) {
+                        this.examined = true;
+                        return 'Pod poduszkami znalazłeś drobne monety i spinki do włosów. Nic istotnego.';
+                    }
+                    return this.description;
+                }
+            },
+            {
+                id: 'door_manicure',
+                type: 'door',
+                x: 700,
+                y: 250,
+                width: 60,
+                height: 100,
+                color: '#8b4513',
+                name: 'Drzwi do pokoju manicure',
+                interactive: true,
+                destination: 'manicure_room',
+                description: 'Drzwi prowadzące do głównego pokoju z stanowiskami.',
+                locked: false
+            },
+            {
+                id: 'front_door',
+                type: 'door',
+                x: 20,
+                y: 250,
+                width: 40,
+                height: 100,
+                color: '#654321',
+                name: 'Drzwi wejściowe',
+                interactive: true,
+                locked: true,
+                description: 'Zamknięte na klucz drzwi wejściowe. Nie możesz stąd wyjść, dopóki nie rozwiążesz tajemnicy.',
+                onExamine: function() {
+                    return 'Drzwi są zamknięte. Muszę znaleźć odpowiedzi zanim stąd wyjdę.';
+                }
+            },
+            {
+                id: 'plant',
+                type: 'decoration',
+                x: 650,
+                y: 450,
+                width: 40,
+                height: 60,
+                color: '#2d5016',
+                name: 'Doniczka z rośliną',
+                interactive: true,
+                examined: false,
+                description: 'Uschnięta roślina w ceramicznej doniczce.',
+                onExamine: function() {
+                    if (!this.examined) {
+                        this.examined = true;
+                        return 'Roślina dawno uschła. W ziemi ktoś ukrył małą wizytówkę - "Dr Kowalski - Psycholog - tel: 555-0123"';
+                    }
+                    return this.description;
+                }
+            }
+        ],
+        walls: [
+            { x: 0, y: 0, width: 800, height: 20 },
+            { x: 0, y: 0, width: 20, height: 600 },
+            { x: 780, y: 0, width: 20, height: 600 },
+            { x: 0, y: 580, width: 800, height: 20 }
+        ]
+    },
+
+    manicure_room: {
+        name: 'Pokój Manicure',
+        width: 800,
+        height: 600,
+        backgroundColor: '#3d2d44',
+        floorColor: '#4d3d5d',
+        objects: [
+            {
+                id: 'station_1',
+                type: 'workstation',
+                x: 100,
+                y: 150,
+                width: 120,
+                height: 80,
+                color: '#5d4037',
+                name: 'Stanowisko 1',
+                interactive: true,
+                examined: false,
+                description: 'Stanowisko do manicure. Narzędzia porozrzucane, jakby ktoś nagle przerwał pracę.',
+                onExamine: function() {
+                    if (!this.examined) {
+                        this.examined = true;
+                        addClue('nail_file', 'Pilnik do paznokci', 'Pilnik z inicjałami "N.K." wygrawerowanymi na rączce.');
+                        showNotification('Znaleziono: Pilnik z inicjałami!');
+                        if (gameState.flags.found_all_initials) {
+                            addObjective('Zbadaj biuro właścicielki', false);
+                        }
+                    }
+                    return this.description;
+                }
+            },
+            {
+                id: 'station_2',
+                type: 'workstation',
+                x: 300,
+                y: 150,
+                width: 120,
+                height: 80,
+                color: '#5d4037',
+                name: 'Stanowisko 2',
+                interactive: true,
+                examined: false,
+                description: 'Stanowisko manicure z lampą UV. Buteleczki z lakierem przewrócone.',
+                onExamine: function() {
+                    if (!this.examined) {
+                        this.examined = true;
+                        return 'Wśród lakierów znajdujesz zapisek: "Natalia była dziwna tego dnia. Pytała o klucze do piwnicy."';
+                    }
+                    return this.description;
+                }
+            },
+            {
+                id: 'station_3',
+                type: 'workstation',
+                x: 500,
+                y: 150,
+                width: 120,
+                height: 80,
+                color: '#5d4037',
+                name: 'Stanowisko 3',
+                interactive: true,
+                examined: false,
+                description: 'Najczystsze stanowisko. Wygląda jakby nie było używane od dawna.',
+                onExamine: function() {
+                    if (!this.examined) {
+                        this.examined = true;
+                        addClue('photo', 'Zdjęcie', 'Zdjęcie Natalii z koleżankami z salonu. Wszyscy się uśmiechają. Na odwrocie: "Najlepszy zespół 2023!"');
+                    }
+                    return this.description;
+                }
+            },
+            {
+                id: 'supply_cabinet',
+                type: 'furniture',
+                x: 650,
+                y: 100,
+                width: 100,
+                height: 150,
+                color: '#424242',
+                name: 'Szafka z przyborami',
+                interactive: true,
+                examined: false,
+                locked: false,
+                description: 'Metalowa szafka z lakierami, pilnikami i innymi narzędziami.',
+                onExamine: function() {
+                    if (!this.examined) {
+                        this.examined = true;
+                        addClue('supplies_note', 'Notatka zaopatrzeniowa', 'Lista zakupów z dopiskiem: "Natalia - pamiętaj o spotkaniu w piwnicy, 18:30"');
+                        showNotification('Ważna wskazówka o piwnicy!');
+                        addObjective('Znajdź wejście do piwnicy', false);
+                    }
+                    return this.description;
+                }
+            },
+            {
+                id: 'mirror_wall',
+                type: 'furniture',
+                x: 80,
+                y: 300,
+                width: 600,
+                height: 20,
+                color: '#87ceeb',
+                name: 'Ściana luster',
+                interactive: true,
+                examined: false,
+                description: 'Duża ściana z lustrami. Widzisz w nich swoje odbicie.',
+                onExamine: function() {
+                    if (!this.examined) {
+                        this.examined = true;
+                        return 'W odbiciu zauważasz coś dziwnego na jednym z luster - ślad palców z czerwonym lakierem.';
+                    }
+                    return this.description;
+                }
+            },
+            {
+                id: 'door_back',
+                type: 'door',
+                x: 700,
+                y: 400,
+                width: 60,
+                height: 100,
+                color: '#8b4513',
+                name: 'Drzwi do zaplecza',
+                interactive: true,
+                destination: 'backroom',
+                description: 'Drzwi prowadzące do zaplecza.',
+                locked: false
+            },
+            {
+                id: 'door_entrance',
+                type: 'door',
+                x: 40,
+                y: 450,
+                width: 60,
+                height: 100,
+                color: '#8b4513',
+                name: 'Drzwi do wejścia',
+                interactive: true,
+                destination: 'entrance',
+                description: 'Drzwi prowadzące z powrotem do wejścia.',
+                locked: false
+            },
+            {
+                id: 'trash_bin',
+                type: 'furniture',
+                x: 600,
+                y: 450,
+                width: 50,
+                height: 60,
+                color: '#696969',
+                name: 'Kosz na śmieci',
+                interactive: true,
+                examined: false,
+                description: 'Kosz pełen wacików i zużytych materiałów.',
+                onExamine: function() {
+                    if (!this.examined) {
+                        this.examined = true;
+                        addClue('torn_note', 'Podarty liścik', 'Podarty liścik: "...nie mogę już tego dłużej ukrywać... prawda o Marcie..."');
+                        showNotification('Znaleziono podartą notatkę!');
+                    }
+                    return this.description;
+                }
+            }
+        ],
+        walls: [
+            { x: 0, y: 0, width: 800, height: 20 },
+            { x: 0, y: 0, width: 20, height: 600 },
+            { x: 780, y: 0, width: 20, height: 600 },
+            { x: 0, y: 580, width: 800, height: 20 }
+        ]
+    },
+
+    backroom: {
+        name: 'Zaplecze',
+        width: 800,
+        height: 600,
+        backgroundColor: '#2d2d2d',
+        floorColor: '#3d3d3d',
+        objects: [
+            {
+                id: 'locker_1',
+                type: 'locker',
+                x: 100,
+                y: 100,
+                width: 80,
+                height: 140,
+                color: '#546e7a',
+                name: 'Szafka Anny',
+                interactive: true,
+                examined: false,
+                locked: false,
+                description: 'Szafka pracownicza z tabliczką "Anna".',
+                onExamine: function() {
+                    if (!this.examined) {
+                        this.examined = true;
+                        return 'W szafce wiszą ubrania robocze i znajduje się torebka z portfelem. Zdjęcie rodzinne w portfelu.';
+                    }
+                    return this.description;
+                }
+            },
+            {
+                id: 'locker_2',
+                type: 'locker',
+                x: 200,
+                y: 100,
+                width: 80,
+                height: 140,
+                color: '#546e7a',
+                name: 'Szafka Oli',
+                interactive: true,
+                examined: false,
+                locked: false,
+                description: 'Szafka pracownicza z tabliczką "Ola".',
+                onExamine: function() {
+                    if (!this.examined) {
+                        this.examined = true;
+                        addClue('ola_diary', 'Pamiętnik Oli', 'Fragment pamiętnika: "Natalia ostatnio była bardzo nerwowa. Bała się kogoś. Mówiła o szantażu..."');
+                        showNotification('Ważne odkrycie w pamiętniku!');
+                    }
+                    return this.description;
+                }
+            },
+            {
+                id: 'locker_3',
+                type: 'locker',
+                x: 300,
+                y: 100,
+                width: 80,
+                height: 140,
+                color: '#546e7a',
+                name: 'Szafka Natalii',
+                interactive: true,
+                examined: false,
+                locked: true,
+                requiredItem: 'small_key',
+                description: 'Szafka pracownicza z tabliczką "Natalia". Zamknięta na kłódkę.',
+                onExamine: function() {
+                    if (this.locked) {
+                        if (hasItem('small_key')) {
+                            this.locked = false;
+                            showNotification('Użyto klucza! Szafka otwarta!');
+                            addClue('natalia_phone', 'Telefon Natalii', 'Stary telefon z ostatnią wiadomością: "Spotkajmy się w piwnicy. Mam dowody." - od nieznanego numeru.');
+                            addClue('natalia_note', 'Notatka Natalii', 'Notatka: "Marta nie popełniła samobójstwa. Ktoś ją zmusił. Mam dowody w sejfie."');
+                            showNotification('WAŻNE: Odkryto wiadomości Natalii!');
+                            addObjective('Znajdź sejf i dowody', false);
+                            gameState.flags.opened_natalia_locker = true;
+                            return 'W szafce znajduje się telefon Natalii i notatka!';
+                        } else {
+                            return 'Szafka jest zamknięta na kłódkę. Potrzebujesz małego klucza.';
+                        }
+                    }
+                    return 'Szafka Natalii już została otwarta.';
+                }
+            },
+            {
+                id: 'fridge',
+                type: 'furniture',
+                x: 600,
+                y: 150,
+                width: 100,
+                height: 120,
+                color: '#e0e0e0',
+                name: 'Lodówka',
+                interactive: true,
+                examined: false,
+                description: 'Mała lodówka dla pracowników.',
+                onExamine: function() {
+                    if (!this.examined) {
+                        this.examined = true;
+                        return 'W lodówce są resztki jedzenia i napoje. Na drzwiach przyklejona kartka: "Natalia - pamiętaj oddać klucz do piwnicy!"';
+                    }
+                    return this.description;
+                }
+            },
+            {
+                id: 'table',
+                type: 'furniture',
+                x: 450,
+                y: 250,
+                width: 120,
+                height: 80,
+                color: '#6d4c41',
+                name: 'Stolik',
+                interactive: true,
+                examined: false,
+                description: 'Stolik z krzesłami dla pracowników.',
+                onExamine: function() {
+                    if (!this.examined) {
+                        this.examined = true;
+                        addClue('newspaper', 'Gazeta', 'Lokalna gazeta sprzed roku: "Pracownica salonu znaleziona martwa. Prawdopodobne samobójstwo."');
+                        showNotification('Artykuł o tajemniczej śmierci!');
+                    }
+                    return this.description;
+                }
+            },
+            {
+                id: 'basement_door',
+                type: 'door',
+                x: 700,
+                y: 450,
+                width: 60,
+                height: 100,
+                color: '#4a4a4a',
+                name: 'Drzwi do piwnicy',
+                interactive: true,
+                destination: 'basement',
+                locked: true,
+                requiredItem: 'basement_key',
+                description: 'Ciężkie drzwi prowadzące do piwnicy. Zamknięte na klucz.',
+                onExamine: function() {
+                    if (this.locked) {
+                        if (hasItem('basement_key')) {
+                            this.locked = false;
+                            showNotification('Użyto klucza od piwnicy!');
+                            addObjective('Zbadaj piwnicę', false);
+                            return 'Drzwi się otworzyły. Prowadzą w ciemność...';
+                        } else {
+                            return 'Potrzebujesz klucza do piwnicy.';
+                        }
+                    }
+                    return 'Drzwi do piwnicy są otwarte.';
+                }
+            },
+            {
+                id: 'office_door',
+                type: 'door',
+                x: 100,
+                y: 450,
+                width: 60,
+                height: 100,
+                color: '#8b4513',
+                name: 'Drzwi do biura',
+                interactive: true,
+                destination: 'office',
+                locked: false,
+                description: 'Drzwi do biura właścicielki.',
+            },
+            {
+                id: 'door_manicure',
+                type: 'door',
+                x: 40,
+                y: 250,
+                width: 60,
+                height: 100,
+                color: '#8b4513',
+                name: 'Drzwi do pokoju manicure',
+                interactive: true,
+                destination: 'manicure_room',
+                description: 'Drzwi z powrotem do pokoju manicure.',
+                locked: false
+            },
+            {
+                id: 'cleaning_supplies',
+                type: 'furniture',
+                x: 600,
+                y: 400,
+                width: 70,
+                height: 100,
+                color: '#757575',
+                name: 'Środki czystości',
+                interactive: true,
+                examined: false,
+                description: 'Szafka ze środkami czystości.',
+                onExamine: function() {
+                    if (!this.examined) {
+                        this.examined = true;
+                        addItem('small_key', 'Mały klucz', 'Mały klucz znaleziony za butelkami z detergentami. Może pasować do szafki?');
+                        showNotification('Znaleziono mały klucz!');
+                        return 'Za butelkami znajdujesz mały klucz!';
+                    }
+                    return this.description;
+                }
+            }
+        ],
+        walls: [
+            { x: 0, y: 0, width: 800, height: 20 },
+            { x: 0, y: 0, width: 20, height: 600 },
+            { x: 780, y: 0, width: 20, height: 600 },
+            { x: 0, y: 580, width: 800, height: 20 }
+        ]
+    },
+
+    office: {
+        name: 'Biuro Właścicielki',
+        width: 800,
+        height: 600,
+        backgroundColor: '#3d2d3d',
+        floorColor: '#4d3d4d',
+        objects: [
+            {
+                id: 'desk',
+                type: 'desk',
+                x: 300,
+                y: 150,
+                width: 200,
+                height: 100,
+                color: '#3e2723',
+                name: 'Biurko',
+                interactive: true,
+                examined: false,
+                description: 'Duże drewniane biurko właścicielki salonu.',
+                onExamine: function() {
+                    if (!this.examined) {
+                        this.examined = true;
+                        addClue('financial_docs', 'Dokumenty finansowe', 'Salon miał poważne problemy finansowe. Długi w wysokości 200,000 zł.');
+                        addClue('insurance_policy', 'Polisa ubezpieczeniowa', 'Polisa na wypadek śmierci pracownika - beneficjent: właścicielka salonu. 500,000 zł.');
+                        showNotification('Szokujące odkrycie finansowe!');
+                        return 'Na biurku leżą dokumenty finansowe i polisa ubezpieczeniowa...';
+                    }
+                    return this.description;
+                }
+            },
+            {
+                id: 'computer',
+                type: 'computer',
+                x: 350,
+                y: 140,
+                width: 60,
+                height: 40,
+                color: '#424242',
+                name: 'Komputer',
+                interactive: true,
+                examined: false,
+                locked: true,
+                requiredCode: '1984',
+                description: 'Komputer właścicielki. Wymaga hasła.',
+                onExamine: function() {
+                    if (this.locked) {
+                        if (gameState.flags.knows_computer_password) {
+                            const password = prompt('Wprowadź hasło (4 cyfry):');
+                            if (password === this.requiredCode) {
+                                this.locked = false;
+                                showNotification('Komputer odblokowany!');
+                                addClue('emails', 'Maile', 'Wymiana maili z nieznanym nadawcą: "Marta wiedziała za dużo. Teraz Natalia też zaczyna węszyć. Musisz coś z tym zrobić."');
+                                showNotification('KLUCZOWY DOWÓD!');
+                                gameState.flags.found_emails = true;
+                                addObjective('Sprawdź piwnicę - tam może być Natalia!', false);
+                                return 'W mailach znajdujesz przerażającą korespondencję!';
+                            } else {
+                                return 'Nieprawidłowe hasło.';
+                            }
+                        } else {
+                            return 'Komputer jest zablokowany hasłem. Gdzieś musi być podpowiedź...';
+                        }
+                    }
+                    return 'Komputer już został odblokowany.';
+                }
+            },
+            {
+                id: 'filing_cabinet',
+                type: 'furniture',
+                x: 600,
+                y: 150,
+                width: 100,
+                height: 150,
+                color: '#616161',
+                name: 'Szafa z aktami',
+                interactive: true,
+                examined: false,
+                description: 'Metalowa szafa z dokumentami.',
+                onExamine: function() {
+                    if (!this.examined) {
+                        this.examined = true;
+                        addClue('employee_files', 'Akta pracowników', 'Teczka "Marta Nowak - ZAKOŃCZONE". Notatka: "Problematyczna. Groziła ujawnieniem nieprawidłowości."');
+                        return 'W szafie znajdujesz teczki wszystkich pracowników...';
+                    }
+                    return this.description;
+                }
+            },
+            {
+                id: 'safe',
+                type: 'safe',
+                x: 100,
+                y: 350,
+                width: 80,
+                height: 100,
+                color: '#37474f',
+                name: 'Sejf',
+                interactive: true,
+                examined: false,
+                locked: true,
+                requiredCode: '2407',
+                description: 'Mały sejf wbudowany w ścianę.',
+                onExamine: function() {
+                    if (this.locked) {
+                        if (gameState.flags.knows_safe_code) {
+                            const code = prompt('Wprowadź kod do sejfu (4 cyfry):');
+                            if (code === this.requiredCode) {
+                                this.locked = false;
+                                showNotification('Sejf otwarty!');
+                                addItem('basement_key', 'Klucz do piwnicy', 'Duży żelazny klucz do piwnicy.');
+                                addClue('hidden_evidence', 'Ukryte dowody', 'Zdjęcia i dokumenty dowodzące, że właścicielka salonu zaaranżowała śmierć Marty dla pieniędzy z ubezpieczenia!');
+                                showNotification('Dowody przestępstwa!');
+                                gameState.flags.found_evidence = true;
+                                return 'W sejfie znajdują się przerażające dowody!';
+                            } else {
+                                return 'Nieprawidłowy kod.';
+                            }
+                        } else {
+                            return 'Sejf wymaga 4-cyfrowego kodu. Musi być gdzieś wskazówka...';
+                        }
+                    }
+                    return 'Sejf został już otwarty.';
+                }
+            },
+            {
+                id: 'calendar',
+                type: 'decoration',
+                x: 200,
+                y: 80,
+                width: 60,
+                height: 80,
+                color: '#fff',
+                name: 'Kalendarz',
+                interactive: true,
+                examined: false,
+                description: 'Kalendarz ścienny.',
+                onExamine: function() {
+                    if (!this.examined) {
+                        this.examined = true;
+                        showNotification('Data 24.07 jest zakreślona!');
+                        gameState.flags.knows_safe_code = true;
+                        return 'Kalendarz z wyraźnie zakreśloną datą: 24.07. Może to kod do czegoś?';
+                    }
+                    return this.description;
+                }
+            },
+            {
+                id: 'bookshelf',
+                type: 'furniture',
+                x: 50,
+                y: 100,
+                width: 120,
+                height: 180,
+                color: '#5d4037',
+                name: 'Regał z książkami',
+                interactive: true,
+                examined: false,
+                description: 'Regał pełen książek o biznesie i zarządzaniu.',
+                onExamine: function() {
+                    if (!this.examined) {
+                        this.examined = true;
+                        showNotification('Rok 1984 jest podkreślony w książce!');
+                        gameState.flags.knows_computer_password = true;
+                        return 'Między książkami znajdujesz notatnik. Na okładce napisane: "Moje ulubione: 1984 - Orwell"';
+                    }
+                    return this.description;
+                }
+            },
+            {
+                id: 'door_back',
+                type: 'door',
+                x: 700,
+                y: 450,
+                width: 60,
+                height: 100,
+                color: '#8b4513',
+                name: 'Drzwi do zaplecza',
+                interactive: true,
+                destination: 'backroom',
+                description: 'Drzwi z powrotem do zaplecza.',
+                locked: false
+            },
+            {
+                id: 'plant_office',
+                type: 'decoration',
+                x: 650,
+                y: 400,
+                width: 40,
+                height: 60,
+                color: '#2d5016',
+                name: 'Roślina',
+                interactive: true,
+                examined: false,
+                description: 'Zadbana roślina w doniczce.',
+                onExamine: function() {
+                    return 'Piękna, zadbana roślina. Kontrast do reszty opuszczonego salonu.';
+                }
+            }
+        ],
+        walls: [
+            { x: 0, y: 0, width: 800, height: 20 },
+            { x: 0, y: 0, width: 20, height: 600 },
+            { x: 780, y: 0, width: 20, height: 600 },
+            { x: 0, y: 580, width: 800, height: 20 }
+        ]
+    },
+
+    basement: {
+        name: 'Piwnica',
+        width: 800,
+        height: 600,
+        backgroundColor: '#1a1a1a',
+        floorColor: '#2a2a2a',
+        objects: [
+            {
+                id: 'old_boxes',
+                type: 'furniture',
+                x: 100,
+                y: 100,
+                width: 150,
+                height: 100,
+                color: '#4a3f35',
+                name: 'Stare pudła',
+                interactive: true,
+                examined: false,
+                description: 'Zakurzone pudła z archiwum.',
+                onExamine: function() {
+                    if (!this.examined) {
+                        this.examined = true;
+                        return 'W pudłach stare dokumenty i faktury z lat poprzednich.';
+                    }
+                    return this.description;
+                }
+            },
+            {
+                id: 'wine_rack',
+                type: 'furniture',
+                x: 400,
+                y: 150,
+                width: 100,
+                height: 120,
+                color: '#6d4c41',
+                name: 'Stojak na wino',
+                interactive: true,
+                examined: false,
+                description: 'Stary stojak z kilkoma butelkami wina.',
+                onExamine: function() {
+                    return 'Zakurzone butelki wina. Wyglądają na bardzo stare.';
+                }
+            },
+            {
+                id: 'hidden_room_door',
+                type: 'door',
+                x: 700,
+                y: 300,
+                width: 60,
+                height: 100,
+                color: '#2d2d2d',
+                name: 'Ukryte drzwi',
+                interactive: true,
+                destination: 'hidden_room',
+                locked: true,
+                description: 'Ledwo widoczne drzwi ukryte za regałem.',
+                onExamine: function() {
+                    if (!gameState.flags.found_hidden_door) {
+                        gameState.flags.found_hidden_door = true;
+                        showNotification('Odkryto ukryte drzwi!');
+                        return 'Za regałem znajdują się ukryte drzwi! Są uchylone...';
+                    }
+                    if (this.locked && gameState.flags.found_hidden_door) {
+                        this.locked = false;
+                        return 'Drzwi są uchylone. Możesz wejść...';
+                    }
+                    return 'Ukryte drzwi prowadzące do tajemniczego pomieszczenia.';
+                }
+            },
+            {
+                id: 'shelf',
+                type: 'furniture',
+                x: 600,
+                y: 300,
+                width: 80,
+                height: 150,
+                color: '#5d4037',
+                name: 'Regał',
+                interactive: true,
+                examined: false,
+                description: 'Stary drewniany regał.',
+                onExamine: function() {
+                    if (!this.examined) {
+                        this.examined = true;
+                        if (!gameState.flags.found_hidden_door) {
+                            gameState.flags.found_hidden_door = true;
+                            showNotification('Regał się przesunął!');
+                            return 'Gdy dotykasz regału, przesuwa się lekko w bok, odkrywając ukryte drzwi!';
+                        }
+                    }
+                    return 'Regał, który ukrywał tajemne drzwi.';
+                }
+            },
+            {
+                id: 'stairs',
+                type: 'stairs',
+                x: 50,
+                y: 450,
+                width: 100,
+                height: 80,
+                color: '#6d6d6d',
+                name: 'Schody w górę',
+                interactive: true,
+                destination: 'backroom',
+                description: 'Schody prowadzące z powrotem do zaplecza.',
+            },
+            {
+                id: 'water_heater',
+                type: 'furniture',
+                x: 250,
+                y: 400,
+                width: 80,
+                height: 120,
+                color: '#757575',
+                name: 'Bojler',
+                interactive: true,
+                examined: false,
+                description: 'Stary bojler wodny.',
+                onExamine: function() {
+                    return 'Bojler nie działa od dawna.';
+                }
+            }
+        ],
+        walls: [
+            { x: 0, y: 0, width: 800, height: 20 },
+            { x: 0, y: 0, width: 20, height: 600 },
+            { x: 780, y: 0, width: 20, height: 600 },
+            { x: 0, y: 580, width: 800, height: 20 }
+        ]
+    },
+
+    hidden_room: {
+        name: 'Ukryte Pomieszczenie',
+        width: 800,
+        height: 600,
+        backgroundColor: '#0d0d0d',
+        floorColor: '#1d1d1d',
+        objects: [
+            {
+                id: 'natalia',
+                type: 'person',
+                x: 400,
+                y: 300,
+                width: 40,
+                height: 60,
+                color: '#ff6b9d',
+                name: 'NATALIA!',
+                interactive: true,
+                examined: false,
+                description: 'Natalia! Żyje, ale jest związana i w szoku!',
+                onExamine: function() {
+                    if (!this.examined) {
+                        this.examined = true;
+                        showDialog('Natalia', 'Znalazłeś mnie! Właścicielka... ona zamknęła mnie tutaj! Chciała mnie uciszyć, tak jak zrobiła z Martą! Mam wszystkie dowody... w sejfie w biurze!');
+                        gameState.flags.found_natalia = true;
+                        addObjective('Uratuj Natalię i zgłoś sprawę na policję!', false);
+                        addObjective('Zbierz wszystkie dowody przeciwko właścicielce', false);
+
+                        setTimeout(() => {
+                            showDialog('System', 'Znalazłeś Natalię! Teraz musisz zebrać wszystkie dowody i rozwiązać całą zagadkę.');
+                        }, 3000);
+
+                        return 'Natalia jest bezpieczna! Opowiada ci całą historię...';
+                    }
+                    return 'Natalia jest wstrząśnięta, ale bezpieczna.';
+                }
+            },
+            {
+                id: 'evidence_board',
+                type: 'furniture',
+                x: 200,
+                y: 100,
+                width: 400,
+                height: 200,
+                color: '#4a4a4a',
+                name: 'Tablica z dowodami',
+                interactive: true,
+                examined: false,
+                description: 'Tablica z wskazówkami, zdjęciami i dokumentami.',
+                onExamine: function() {
+                    if (!this.examined) {
+                        this.examined = true;
+                        addClue('natalia_investigation', 'Śledztwo Natalii', 'Natalia przez miesiące zbierała dowody na to, że Marta została zamordowana przez właścicielkę dla pieniędzy z ubezpieczenia. Właścicielka odkryła jej śledztwo i uwięziła ją tutaj.');
+                        showNotification('Pełna historia odkryta!');
+                        gameState.flags.knows_full_story = true;
+
+                        if (gameState.flags.found_evidence && gameState.flags.found_emails) {
+                            setTimeout(() => {
+                                showFinalDialog();
+                            }, 2000);
+                        }
+
+                        return 'Cała historia jest tutaj - od początku do końca. Marta odkryła nielegalne praktyki finansowe. Właścicielka inscenizowała jej samobójstwo...';
+                    }
+                    return this.description;
+                }
+            },
+            {
+                id: 'chains',
+                type: 'decoration',
+                x: 380,
+                y: 350,
+                width: 80,
+                height: 20,
+                color: '#999',
+                name: 'Łańcuchy',
+                interactive: true,
+                examined: false,
+                description: 'Łańcuchy, którymi była związana Natalia.',
+                onExamine: function() {
+                    return 'Łańcuchy zostały przecięte. Natalia jest wolna.';
+                }
+            },
+            {
+                id: 'door_basement',
+                type: 'door',
+                x: 40,
+                y: 450,
+                width: 60,
+                height: 100,
+                color: '#2d2d2d',
+                name: 'Drzwi do piwnicy',
+                interactive: true,
+                destination: 'basement',
+                description: 'Drzwi z powrotem do piwnicy.',
+                locked: false
+            },
+            {
+                id: 'supplies',
+                type: 'furniture',
+                x: 650,
+                y: 200,
+                width: 100,
+                height: 80,
+                color: '#6d4c41',
+                name: 'Zapasy',
+                interactive: true,
+                examined: false,
+                description: 'Jedzenie i woda - dowód na to, że ktoś planował przetrzymywać tutaj Natalię przez długi czas.',
+                onExamine: function() {
+                    return 'Zapasy jedzenia i wody. To było wszystko zaplanowane...';
+                }
+            }
+        ],
+        walls: [
+            { x: 0, y: 0, width: 800, height: 20 },
+            { x: 0, y: 0, width: 20, height: 600 },
+            { x: 780, y: 0, width: 20, height: 600 },
+            { x: 0, y: 580, width: 800, height: 20 }
+        ]
+    }
+};
+
+// ==================== GAME FUNCTIONS ====================
+
+function startNewGame() {
+    document.getElementById('title-screen').style.display = 'none';
+    gameState.currentRoom = 'entrance';
+    gameState.inventory = [];
+    gameState.clues = [];
+    gameState.flags = {};
+    gameState.objectives = [];
+    gameState.player = {
+        x: 400,
+        y: 300,
+        direction: 'down',
+        animFrame: 0,
+        animTimer: 0
+    };
+
+    addObjective('Rozejrzyj się po salonie', false);
+    addObjective('Znajdź wskazówki o Natalii', false);
+
+    showDialog('System', 'Witaj w opuszczonym salonie paznokci. Twoja przyjaciółka Natalia zaginęła miesiąc temu. Ostatni raz widziano ją tutaj. Zbadaj salon i odkryj prawdę...');
+
+    gameLoop();
+}
+
+function loadGame() {
+    const saved = localStorage.getItem('nailSalonSave');
+    if (saved) {
+        const data = JSON.parse(saved);
+        Object.assign(gameState, data);
+        document.getElementById('title-screen').style.display = 'none';
+        updateUI();
+        gameLoop();
+    } else {
+        alert('Brak zapisanej gry!');
+    }
+}
+
+function saveGame() {
+    localStorage.setItem('nailSalonSave', JSON.stringify(gameState));
+    showNotification('Gra zapisana!');
+}
+
+function addItem(id, name, description) {
+    if (!gameState.inventory.find(item => item.id === id)) {
+        gameState.inventory.push({ id, name, description });
+        updateUI();
+    }
+}
+
+function hasItem(id) {
+    return gameState.inventory.find(item => item.id === id) !== undefined;
+}
+
+function addClue(id, name, description) {
+    if (!gameState.clues.find(clue => clue.id === id)) {
+        gameState.clues.push({ id, name, description });
+        updateUI();
+    }
+}
+
+function addObjective(text, completed = false) {
+    if (!gameState.objectives.find(obj => obj.text === text)) {
+        gameState.objectives.push({ text, completed });
+        updateUI();
+    }
+}
+
+function completeObjective(text) {
+    const obj = gameState.objectives.find(o => o.text === text);
+    if (obj) {
+        obj.completed = true;
+        updateUI();
+    }
+}
+
+function showDialog(speaker, text) {
+    const dialogBox = document.getElementById('dialog-box');
+    const speakerEl = document.getElementById('dialog-speaker');
+    const textEl = document.getElementById('dialog-text');
+
+    speakerEl.textContent = speaker;
+    textEl.textContent = text;
+    dialogBox.classList.add('active');
+
+    gameState.dialogActive = true;
+}
+
+function hideDialog() {
+    document.getElementById('dialog-box').classList.remove('active');
+    gameState.dialogActive = false;
+}
+
+function showNotification(text) {
+    const notif = document.createElement('div');
+    notif.className = 'notification';
+    notif.textContent = text;
+    document.body.appendChild(notif);
+
+    setTimeout(() => {
+        document.body.removeChild(notif);
+    }, 2000);
+}
+
+function showFinalDialog() {
+    showDialog('KONIEC', 'GRATULACJE! Odkryłeś całą prawdę! Właścicielka salonu zabiła Martę dla pieniędzy z ubezpieczenia i chciała uciszyć Natalię, która odkryła jej zbrodnie. Dzięki tobie Natalia jest bezpieczna, a sprawiedliwość zostanie wymierzona. Policja jest w drodze!');
+
+    setTimeout(() => {
+        if (confirm('Ukończyłeś grę! Czy chcesz zagrać ponownie?')) {
+            location.reload();
+        }
+    }, 5000);
+}
+
+function updateUI() {
+    // Update inventory
+    const inventoryList = document.getElementById('inventory-items');
+    inventoryList.innerHTML = '';
+
+    gameState.inventory.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'inventory-item';
+        div.textContent = item.name;
+        div.title = item.description;
+        inventoryList.appendChild(div);
+    });
+
+    // Add clues to inventory
+    gameState.clues.forEach(clue => {
+        const div = document.createElement('div');
+        div.className = 'inventory-item';
+        div.textContent = '📋 ' + clue.name;
+        div.title = clue.description;
+        div.style.background = 'rgba(69, 123, 233, 0.2)';
+        div.style.borderColor = '#457be9';
+        inventoryList.appendChild(div);
+    });
+
+    // Update objectives
+    const objectivesList = document.getElementById('objectives-list');
+    objectivesList.innerHTML = '';
+
+    gameState.objectives.forEach(obj => {
+        const div = document.createElement('div');
+        div.className = 'objective' + (obj.completed ? ' completed' : '');
+        div.textContent = (obj.completed ? '✓ ' : '○ ') + obj.text;
+        objectivesList.appendChild(div);
+    });
+
+    // Enable/disable load button
+    document.getElementById('load-btn').disabled = !localStorage.getItem('nailSalonSave');
+}
+
+function handleInteraction() {
+    if (gameState.dialogActive) {
+        hideDialog();
+        return;
+    }
+
+    const room = rooms[gameState.currentRoom];
+    const player = gameState.player;
+
+    // Check for nearby objects
+    room.objects.forEach(obj => {
+        if (obj.interactive) {
+            const distance = Math.sqrt(
+                Math.pow(player.x - (obj.x + obj.width/2), 2) +
+                Math.pow(player.y - (obj.y + obj.height/2), 2)
+            );
+
+            if (distance < 80) {
+                if (obj.type === 'door') {
+                    if (obj.locked) {
+                        if (obj.onExamine) {
+                            const msg = obj.onExamine();
+                            showDialog('System', msg);
+                        } else {
+                            showDialog('System', obj.description || 'Drzwi są zamknięte.');
+                        }
+                    } else {
+                        gameState.currentRoom = obj.destination;
+                        // Reposition player
+                        gameState.player.x = 400;
+                        gameState.player.y = 300;
+                        saveGame(); // Auto-save on room change
+                    }
+                } else if (obj.type === 'stairs') {
+                    gameState.currentRoom = obj.destination;
+                    gameState.player.x = 400;
+                    gameState.player.y = 300;
+                    saveGame();
+                } else {
+                    if (obj.onExamine) {
+                        const msg = obj.onExamine();
+                        showDialog(obj.name, msg);
+                    } else {
+                        showDialog(obj.name, obj.description);
+                    }
+                }
+            }
+        }
+    });
+}
+
+// ==================== RENDERING ====================
+
+function drawPlayer() {
+    const p = gameState.player;
+
+    // Body
+    ctx.fillStyle = '#4a90e2';
+    ctx.fillRect(p.x - 12, p.y - 20, 24, 30);
+
+    // Head
+    ctx.fillStyle = '#ffdbac';
+    ctx.fillRect(p.x - 10, p.y - 30, 20, 20);
+
+    // Hair
+    ctx.fillStyle = '#3d2817';
+    ctx.fillRect(p.x - 10, p.y - 35, 20, 10);
+
+    // Eyes
+    ctx.fillStyle = '#000';
+    if (p.direction === 'down' || p.direction === 'up') {
+        ctx.fillRect(p.x - 6, p.y - 25, 3, 3);
+        ctx.fillRect(p.x + 3, p.y - 25, 3, 3);
+    }
+
+    // Legs
+    ctx.fillStyle = '#2d5f3d';
+    ctx.fillRect(p.x - 10, p.y + 10, 8, 15);
+    ctx.fillRect(p.x + 2, p.y + 10, 8, 15);
+}
+
+function drawRoom() {
+    const room = rooms[gameState.currentRoom];
+
+    // Background
+    ctx.fillStyle = room.backgroundColor;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Floor
+    ctx.fillStyle = room.floorColor;
+    ctx.fillRect(20, 20, canvas.width - 40, canvas.height - 40);
+
+    // Floor pattern
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < canvas.width; i += TILE_SIZE) {
+        ctx.beginPath();
+        ctx.moveTo(i, 0);
+        ctx.lineTo(i, canvas.height);
+        ctx.stroke();
+    }
+    for (let i = 0; i < canvas.height; i += TILE_SIZE) {
+        ctx.beginPath();
+        ctx.moveTo(0, i);
+        ctx.lineTo(canvas.width, i);
+        ctx.stroke();
+    }
+
+    // Walls
+    ctx.fillStyle = '#1a1a2e';
+    room.walls.forEach(wall => {
+        ctx.fillRect(wall.x, wall.y, wall.width, wall.height);
+    });
+
+    // Objects
+    room.objects.forEach(obj => {
+        // Shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.fillRect(obj.x + 2, obj.y + obj.height - 2, obj.width, 4);
+
+        // Object
+        ctx.fillStyle = obj.color;
+        ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
+
+        // Outline
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(obj.x, obj.y, obj.width, obj.height);
+
+        // Special rendering
+        if (obj.type === 'door') {
+            ctx.fillStyle = '#654321';
+            ctx.fillRect(obj.x + 5, obj.y + 10, obj.width - 10, obj.height - 20);
+            // Door handle
+            ctx.fillStyle = '#ffd700';
+            ctx.fillRect(obj.x + obj.width - 15, obj.y + obj.height/2, 5, 8);
+
+            if (obj.locked) {
+                ctx.fillStyle = '#ff0000';
+                ctx.font = 'bold 20px Arial';
+                ctx.fillText('🔒', obj.x + obj.width/2 - 10, obj.y - 10);
+            }
+        }
+
+        if (obj.type === 'person') {
+            // Draw simple person
+            ctx.fillStyle = '#ffdbac';
+            ctx.fillRect(obj.x + 5, obj.y, 30, 25); // head
+            ctx.fillStyle = obj.color;
+            ctx.fillRect(obj.x, obj.y + 25, obj.width, 35); // body
+
+            // Exclamation mark
+            ctx.fillStyle = '#ff0000';
+            ctx.font = 'bold 30px Arial';
+            ctx.fillText('!', obj.x + obj.width/2 - 5, obj.y - 10);
+        }
+
+        // Interactive indicator
+        if (obj.interactive) {
+            const distance = Math.sqrt(
+                Math.pow(gameState.player.x - (obj.x + obj.width/2), 2) +
+                Math.pow(gameState.player.y - (obj.y + obj.height/2), 2)
+            );
+
+            if (distance < 80) {
+                ctx.fillStyle = 'rgba(233, 69, 96, 0.5)';
+                ctx.beginPath();
+                ctx.arc(obj.x + obj.width/2, obj.y - 15, 8, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 12px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('E', obj.x + obj.width/2, obj.y - 11);
+                ctx.textAlign = 'left';
+            }
+        }
+    });
+
+    // Room name
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, canvas.width, 40);
+    ctx.fillStyle = '#e94560';
+    ctx.font = 'bold 20px Courier New';
+    ctx.textAlign = 'center';
+    ctx.fillText(room.name, canvas.width/2, 25);
+    ctx.textAlign = 'left';
+}
+
+function updatePlayer() {
+    if (gameState.dialogActive) return;
+
+    const p = gameState.player;
+    let moving = false;
+
+    // Movement
+    if (keys['w'] || keys['arrowup']) {
+        p.y -= PLAYER_SPEED;
+        p.direction = 'up';
+        moving = true;
+    }
+    if (keys['s'] || keys['arrowdown']) {
+        p.y += PLAYER_SPEED;
+        p.direction = 'down';
+        moving = true;
+    }
+    if (keys['a'] || keys['arrowleft']) {
+        p.x -= PLAYER_SPEED;
+        p.direction = 'left';
+        moving = true;
+    }
+    if (keys['d'] || keys['arrowright']) {
+        p.x += PLAYER_SPEED;
+        p.direction = 'right';
+        moving = true;
+    }
+
+    // Animation
+    if (moving) {
+        p.animTimer++;
+        if (p.animTimer > 10) {
+            p.animTimer = 0;
+            p.animFrame = (p.animFrame + 1) % 4;
+        }
+    }
+
+    // Collision with walls
+    const room = rooms[gameState.currentRoom];
+    room.walls.forEach(wall => {
+        if (p.x > wall.x && p.x < wall.x + wall.width &&
+            p.y > wall.y && p.y < wall.y + wall.height) {
+            // Push player out
+            if (keys['w'] || keys['arrowup']) p.y += PLAYER_SPEED;
+            if (keys['s'] || keys['arrowdown']) p.y -= PLAYER_SPEED;
+            if (keys['a'] || keys['arrowleft']) p.x += PLAYER_SPEED;
+            if (keys['d'] || keys['arrowright']) p.x -= PLAYER_SPEED;
+        }
+    });
+
+    // Collision with objects
+    room.objects.forEach(obj => {
+        if (obj.type !== 'door' && obj.type !== 'stairs') {
+            if (p.x > obj.x - 15 && p.x < obj.x + obj.width + 15 &&
+                p.y > obj.y - 15 && p.y < obj.y + obj.height + 15) {
+                // Push player out
+                if (keys['w'] || keys['arrowup']) p.y += PLAYER_SPEED;
+                if (keys['s'] || keys['arrowdown']) p.y -= PLAYER_SPEED;
+                if (keys['a'] || keys['arrowleft']) p.x += PLAYER_SPEED;
+                if (keys['d'] || keys['arrowright']) p.x -= PLAYER_SPEED;
+            }
+        }
+    });
+
+    // Bounds
+    p.x = Math.max(30, Math.min(canvas.width - 30, p.x));
+    p.y = Math.max(40, Math.min(canvas.height - 30, p.y));
+}
+
+// ==================== GAME LOOP ====================
+
+function gameLoop() {
+    updatePlayer();
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawRoom();
+    drawPlayer();
+
+    requestAnimationFrame(gameLoop);
+}
+
+// ==================== INITIALIZATION ====================
+
+updateUI();
+
+// Check for saved game
+if (localStorage.getItem('nailSalonSave')) {
+    document.getElementById('load-btn').disabled = false;
+}
