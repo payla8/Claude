@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>💅 Salon Paznokci: Deluxe Edition</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a0f;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+        }
+
+        #game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+            position: relative;
+        }
+
+        #game-canvas {
+            border: 6px solid #1a4d7a;
+            box-shadow: 0 0 40px rgba(26, 77, 122, 0.5);
+            image-rendering: pixelated;
+            background: #000;
+        }
+
+        .ui-panel {
+            position: absolute;
+            background: linear-gradient(135deg, rgba(10, 20, 40, 0.95), rgba(20, 30, 50, 0.95));
+            border: 3px solid #2a5d8a;
+            border-radius: 8px;
+            padding: 15px;
+            color: #fff;
+            box-shadow: 0 5px 25px rgba(0, 0, 0, 0.7);
+        }
+
+        #objectives-panel {
+            top: 20px;
+            left: 20px;
+            min-width: 300px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        #inventory-panel {
+            top: 20px;
+            right: 20px;
+            min-width: 280px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        #stats-panel {
+            bottom: 20px;
+            left: 20px;
+            min-width: 250px;
+        }
+
+        .panel-header {
+            color: #5dade2;
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 12px;
+            border-bottom: 2px solid #2a5d8a;
+            padding-bottom: 8px;
+        }
+
+        .objective-item {
+            padding: 8px;
+            margin: 6px 0;
+            background: rgba(93, 173, 226, 0.1);
+            border-left: 4px solid #5dade2;
+            font-size: 13px;
+        }
+
+        .objective-item.completed {
+            opacity: 0.5;
+            text-decoration: line-through;
+        }
+
+        .inventory-item {
+            padding: 10px;
+            margin: 6px 0;
+            background: linear-gradient(135deg, rgba(155, 89, 182, 0.2), rgba(142, 68, 173, 0.3));
+            border: 2px solid #8e44ad;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 13px;
+        }
+
+        .stat-value {
+            color: #f39c12;
+            font-weight: bold;
+        }
+
+        #dialog-box {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 85%;
+            max-width: 700px;
+            background: linear-gradient(135deg, rgba(10, 20, 40, 0.98), rgba(20, 30, 50, 0.98));
+            border: 4px solid #e74c3c;
+            border-radius: 12px;
+            padding: 25px;
+            color: #fff;
+            box-shadow: 0 10px 50px rgba(0, 0, 0, 0.9);
+            display: none;
+        }
+
+        #dialog-box.active {
+            display: block;
+        }
+
+        #dialog-speaker {
+            color: #e74c3c;
+            font-weight: bold;
+            font-size: 18px;
+            margin-bottom: 12px;
+        }
+
+        #dialog-text {
+            font-size: 15px;
+            line-height: 1.8;
+        }
+
+        .dialog-continue {
+            position: absolute;
+            bottom: 8px;
+            right: 15px;
+            color: #95a5a6;
+            font-size: 12px;
+        }
+
+        #title-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 50%, #0f3460 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        #title-screen h1 {
+            color: #e74c3c;
+            font-size: 56px;
+            margin-bottom: 10px;
+            text-shadow: 3px 3px 0px #000, 0 0 20px rgba(231, 76, 60, 0.5);
+        }
+
+        #title-screen h2 {
+            color: #fff;
+            font-size: 28px;
+            margin-bottom: 50px;
+        }
+
+        .menu-button {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: #fff;
+            border: none;
+            padding: 18px 50px;
+            font-size: 20px;
+            font-family: 'Courier New', monospace;
+            cursor: pointer;
+            margin: 12px;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .menu-button:hover {
+            background: linear-gradient(135deg, #ff5544, #e74c3c);
+            transform: translateY(-3px);
+        }
+
+        .menu-button:disabled {
+            background: #7f8c8d;
+            cursor: not-allowed;
+        }
+
+        .notification {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(135deg, rgba(231, 76, 60, 0.98), rgba(192, 57, 43, 0.98));
+            color: #fff;
+            padding: 25px 50px;
+            border: 4px solid #fff;
+            border-radius: 12px;
+            font-size: 20px;
+            font-weight: bold;
+            z-index: 1500;
+            animation: notificationPop 2.5s ease-in-out;
+        }
+
+        @keyframes notificationPop {
+            0%, 100% { opacity: 0; }
+            10%, 90% { opacity: 1; }
+        }
+
+        #controls-info {
+            position: absolute;
+            top: 50%;
+            left: 20px;
+            transform: translateY(-50%);
+            background: rgba(10, 20, 40, 0.9);
+            border: 2px solid #2a5d8a;
+            border-radius: 8px;
+            padding: 15px;
+            font-size: 12px;
+            color: #bdc3c7;
+        }
+
+        .control-row {
+            margin: 5px 0;
+        }
+
+        .key-btn {
+            background: #34495e;
+            color: #3498db;
+            border: 2px solid #2a5d8a;
+            border-radius: 4px;
+            padding: 5px 10px;
+            font-weight: bold;
+            display: inline-block;
+            min-width: 35px;
+            text-align: center;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="title-screen">
+        <h1>💅 SALON PAZNOKCI 💅</h1>
+        <h2>Tajemnica Zaginionej - DELUXE</h2>
+        <button class="menu-button" id="btn-new-game">NOWA GRA</button>
+        <button class="menu-button" id="btn-continue" disabled>KONTYNUUJ</button>
+    </div>
+
+    <div id="game-container" style="display:none;">
+        <canvas id="game-canvas" width="960" height="720"></canvas>
+
+        <div class="ui-panel" id="objectives-panel">
+            <div class="panel-header">🎯 CELE</div>
+            <div id="objectives-list"></div>
+        </div>
+
+        <div class="ui-panel" id="inventory-panel">
+            <div class="panel-header">🎒 EKWIPUNEK</div>
+            <div id="inventory-list"></div>
+        </div>
+
+        <div class="ui-panel" id="stats-panel">
+            <div class="panel-header">📊 STATYSTYKI</div>
+            <div id="stats-content">
+                <div class="stat-row">
+                    <span>Wskazówki:</span>
+                    <span class="stat-value" id="stat-clues">0</span>
+                </div>
+                <div class="stat-row">
+                    <span>Przedmioty:</span>
+                    <span class="stat-value" id="stat-items">0</span>
+                </div>
+                <div class="stat-row">
+                    <span>Pokoje:</span>
+                    <span class="stat-value" id="stat-rooms">0/6</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="controls-info">
+            <div class="control-row">
+                <span class="key-btn">WSAD</span>Ruch
+            </div>
+            <div class="control-row">
+                <span class="key-btn">E</span>Interakcja
+            </div>
+            <div class="control-row">
+                <span class="key-btn">ESC</span>Menu
+            </div>
+        </div>
+
+        <div id="dialog-box">
+            <div id="dialog-speaker"></div>
+            <div id="dialog-text"></div>
+            <div class="dialog-continue">▶ Naciśnij E...</div>
+        </div>
+    </div>
+
+    <script>
+// ==================== SOUND SYSTEM ====================
+class SoundSystem {
+    constructor() {
+        this.enabled = true;
+        this.context = null;
+        this.masterVolume = 0.3;
+
+        try {
+            this.context = new (window.AudioContext || window.webkitAudioContext)();
+        } catch(e) {
+            console.log('Audio not supported');
+            this.enabled = false;
+        }
+    }
+
+    playTone(frequency, duration, type = 'sine') {
+        if (!this.enabled || !this.context) return;
+
+        const oscillator = this.context.createOscillator();
+        const gainNode = this.context.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(this.context.destination);
+
+        oscillator.frequency.value = frequency;
+        oscillator.type = type;
+
+        gainNode.gain.setValueAtTime(this.masterVolume, this.context.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, this.context.currentTime + duration);
+
+        oscillator.start(this.context.currentTime);
+        oscillator.stop(this.context.currentTime + duration);
+    }
+
+    click() {
+        this.playTone(800, 0.1, 'square');
+    }
+
+    interact() {
+        this.playTone(600, 0.15, 'sine');
+        setTimeout(() => this.playTone(800, 0.1, 'sine'), 50);
+    }
+
+    collect() {
+        this.playTone(523, 0.1);
+        setTimeout(() => this.playTone(659, 0.1), 100);
+        setTimeout(() => this.playTone(784, 0.2), 200);
+    }
+
+    achievement() {
+        this.playTone(523, 0.15);
+        setTimeout(() => this.playTone(659, 0.15), 100);
+        setTimeout(() => this.playTone(784, 0.15), 200);
+        setTimeout(() => this.playTone(1047, 0.3), 300);
+    }
+
+    unlock() {
+        this.playTone(400, 0.1);
+        setTimeout(() => this.playTone(500, 0.1), 100);
+        setTimeout(() => this.playTone(700, 0.2), 200);
+    }
+
+    error() {
+        this.playTone(200, 0.3, 'sawtooth');
+    }
+
+    footstep() {
+        this.playTone(100, 0.05, 'square');
+    }
+
+    doorOpen() {
+        this.playTone(300, 0.2);
+        setTimeout(() => this.playTone(250, 0.3), 100);
+    }
+}
+
+const sounds = new SoundSystem();
+
+// ==================== GAME STATE ====================
+class GameState {
+    constructor() {
+        this.currentRoom = 'entrance';
+        this.player = {
+            x: 480,
+            y: 400,
+            direction: 'down',
+            animFrame: 0,
+            animTimer: 0
+        };
+        this.inventory = [];
+        this.clues = [];
+        this.objectives = [];
+        this.flags = {};
+        this.dialogActive = false;
+        this.visitedRooms = new Set(['entrance']);
+        this.footstepTimer = 0;
+    }
+
+    addItem(id, name, description, icon = '📦') {
+        if (!this.inventory.find(item => item.id === id)) {
+            this.inventory.push({ id, name, description, icon });
+            sounds.collect();
+            this.updateUI();
+        }
+    }
+
+    addClue(id, name, description, icon = '📋') {
+        if (!this.clues.find(clue => clue.id === id)) {
+            this.clues.push({ id, name, description, icon });
+            sounds.collect();
+            this.updateUI();
+        }
+    }
+
+    addObjective(text) {
+        if (!this.objectives.find(obj => obj.text === text)) {
+            this.objectives.push({ text, completed: false });
+            this.updateUI();
+        }
+    }
+
+    completeObjective(text) {
+        const obj = this.objectives.find(o => o.text === text);
+        if (obj && !obj.completed) {
+            obj.completed = true;
+            sounds.achievement();
+            this.updateUI();
+        }
+    }
+
+    updateUI() {
+        // Objectives
+        const list = document.getElementById('objectives-list');
+        list.innerHTML = '';
+        this.objectives.forEach(obj => {
+            const div = document.createElement('div');
+            div.className = 'objective-item' + (obj.completed ? ' completed' : '');
+            div.textContent = (obj.completed ? '✓ ' : '○ ') + obj.text;
+            list.appendChild(div);
+        });
+
+        // Inventory
+        const invList = document.getElementById('inventory-list');
+        invList.innerHTML = '';
+        [...this.inventory, ...this.clues].forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'inventory-item';
+            div.innerHTML = `${item.icon} <strong>${item.name}</strong><br><small>${item.description}</small>`;
+            invList.appendChild(div);
+        });
+
+        // Stats
+        document.getElementById('stat-clues').textContent = this.clues.length;
+        document.getElementById('stat-items').textContent = this.inventory.length;
+        document.getElementById('stat-rooms').textContent = `${this.visitedRooms.size}/6`;
+    }
+}
+
+// ==================== SPRITE RENDERER ====================
+class SpriteRenderer {
+    static drawPlayer(ctx, x, y, direction, frame) {
+        ctx.save();
+
+        // Shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.beginPath();
+        ctx.ellipse(x, y + 28, 12, 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Legs
+        const legOffset = frame % 2 === 0 ? 2 : -2;
+        ctx.fillStyle = '#2d5f3d';
+        ctx.fillRect(x - 6, y + 15, 6, 12);
+        ctx.fillRect(x + 2, y + 15, 6, 12);
+
+        // Body
+        ctx.fillStyle = '#4a90e2';
+        ctx.fillRect(x - 10, y - 5, 20, 20);
+
+        // Arms
+        ctx.fillStyle = '#ffdbac';
+        ctx.fillRect(x - 14, y + 2, 4, 10);
+        ctx.fillRect(x + 10, y + 2, 4, 10);
+
+        // Head
+        ctx.fillStyle = '#ffdbac';
+        ctx.fillRect(x - 8, y - 20, 16, 16);
+
+        // Hair
+        ctx.fillStyle = '#3d2817';
+        ctx.fillRect(x - 9, y - 22, 18, 8);
+
+        // Eyes
+        if (direction === 'down') {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(x - 5, y - 15, 2, 2);
+            ctx.fillRect(x + 3, y - 15, 2, 2);
+        }
+
+        ctx.restore();
+    }
+
+    static drawObject(ctx, obj) {
+        ctx.save();
+
+        // Shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+        ctx.fillRect(obj.x + 3, obj.y + obj.height - 3, obj.width, 5);
+
+        // Object
+        ctx.fillStyle = obj.color;
+        ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
+
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(obj.x, obj.y, obj.width, obj.height);
+
+        // Door details
+        if (obj.type === 'door') {
+            ctx.fillStyle = '#ffd700';
+            ctx.fillRect(obj.x + obj.width - 15, obj.y + obj.height/2, 8, 8);
+        }
+
+        // Interactive indicator
+        if (obj.interactive && obj.showIndicator) {
+            ctx.fillStyle = '#e74c3c';
+            ctx.beginPath();
+            ctx.arc(obj.x + obj.width/2, obj.y - 20, 10, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 14px Courier';
+            ctx.textAlign = 'center';
+            ctx.fillText('E', obj.x + obj.width/2, obj.y - 16);
+        }
+
+        ctx.restore();
+    }
+}
+
+// ==================== ROOMS ====================
+const ROOMS = {
+    entrance: {
+        name: 'Wejście do Salonu',
+        bgColor: '#2d2d44',
+        floorColor: '#3d3d5d',
+        objects: [
+            {
+                id: 'reception',
+                type: 'desk',
+                x: 380, y: 150,
+                width: 200, height: 100,
+                color: '#6b4e3d',
+                interactive: true,
+                name: 'Recepcja',
+                examined: false,
+                onInteract: function(game) {
+                    if (!this.examined) {
+                        this.examined = true;
+                        game.addClue('terminarz', 'Terminarz', 'Ostatni wpis: Natalia - 18:00', '📅');
+                        game.addObjective('Sprawdź pokój manicure');
+                        showNotification('Znaleziono terminarz!');
+                        return 'Na recepcji leży terminarz. Ostatni wpis dotyczy Natalii...';
+                    }
+                    return 'Zakurzona recepcja.';
+                }
+            },
+            {
+                id: 'door_manicure',
+                type: 'door',
+                x: 850, y: 300,
+                width: 80, height: 140,
+                color: '#8b6f47',
+                interactive: true,
+                destination: 'manicure_room',
+                name: 'Drzwi do pokoju manicure'
+            }
+        ]
+    },
+
+    manicure_room: {
+        name: 'Pokój Manicure',
+        bgColor: '#3d2d44',
+        floorColor: '#4d3d5d',
+        objects: [
+            {
+                id: 'station1',
+                type: 'desk',
+                x: 150, y: 200,
+                width: 140, height: 100,
+                color: '#5d4037',
+                interactive: true,
+                name: 'Stanowisko 1',
+                examined: false,
+                onInteract: function(game) {
+                    if (!this.examined) {
+                        this.examined = true;
+                        game.addClue('pilnik', 'Pilnik N.K.', 'Inicjały Natalii na pilniku', '🔧');
+                        showNotification('Znaleziono pilnik!');
+                        return 'Pilnik z inicjałami "N.K." - Natalia!';
+                    }
+                    return 'Stanowisko do manicure.';
+                }
+            },
+            {
+                id: 'cabinet',
+                type: 'furniture',
+                x: 700, y: 150,
+                width: 120, height: 180,
+                color: '#546e7a',
+                interactive: true,
+                name: 'Szafka',
+                examined: false,
+                onInteract: function(game) {
+                    if (!this.examined) {
+                        this.examined = true;
+                        game.addClue('note', 'Notatka', 'Spotkanie w piwnicy 18:30', '📄');
+                        game.addObjective('Znajdź piwnicę');
+                        showNotification('Ważna notatka!');
+                        return 'Notatka o spotkaniu w piwnicy!';
+                    }
+                    return 'Szafka z narzędziami.';
+                }
+            },
+            {
+                id: 'door_back',
+                type: 'door',
+                x: 850, y: 500,
+                width: 80, height: 140,
+                color: '#8b6f47',
+                interactive: true,
+                destination: 'backroom',
+                name: 'Do zaplecza'
+            },
+            {
+                id: 'door_entrance',
+                type: 'door',
+                x: 30, y: 500,
+                width: 80, height: 140,
+                color: '#8b6f47',
+                interactive: true,
+                destination: 'entrance',
+                name: 'Powrót'
+            }
+        ]
+    },
+
+    backroom: {
+        name: 'Zaplecze',
+        bgColor: '#2d2d2d',
+        floorColor: '#3d3d3d',
+        objects: [
+            {
+                id: 'locker',
+                type: 'furniture',
+                x: 400, y: 150,
+                width: 100, height: 160,
+                color: '#546e7a',
+                interactive: true,
+                locked: true,
+                name: 'Szafka Natalii',
+                onInteract: function(game) {
+                    if (this.locked) {
+                        if (game.inventory.find(i => i.id === 'small_key')) {
+                            this.locked = false;
+                            sounds.unlock();
+                            game.addClue('phone', 'Telefon', 'SMS: "Mam dowody w sejfie"', '📱');
+                            showNotification('Szafka otwarta!');
+                            return 'Telefon Natalii z ważną wiadomością!';
+                        }
+                        return 'Zamknięte. Potrzebujesz klucza.';
+                    }
+                    return 'Szafka już otwarta.';
+                }
+            },
+            {
+                id: 'closet',
+                type: 'furniture',
+                x: 700, y: 450,
+                width: 100, height: 140,
+                color: '#757575',
+                interactive: true,
+                name: 'Środki czystości',
+                examined: false,
+                onInteract: function(game) {
+                    if (!this.examined) {
+                        this.examined = true;
+                        game.addItem('small_key', 'Mały klucz', 'Klucz do szafki', '🔑');
+                        showNotification('Klucz znaleziony!');
+                        return 'Za butelkami znajdujesz klucz!';
+                    }
+                    return 'Szafka z detergentami.';
+                }
+            },
+            {
+                id: 'door_office',
+                type: 'door',
+                x: 150, y: 500,
+                width: 80, height: 140,
+                color: '#8b6f47',
+                interactive: true,
+                destination: 'office',
+                name: 'Do biura'
+            },
+            {
+                id: 'door_manicure',
+                type: 'door',
+                x: 30, y: 300,
+                width: 80, height: 140,
+                color: '#8b6f47',
+                interactive: true,
+                destination: 'manicure_room',
+                name: 'Powrót'
+            }
+        ]
+    },
+
+    office: {
+        name: 'Biuro Właścicielki',
+        bgColor: '#3d2d3d',
+        floorColor: '#4d3d4d',
+        objects: [
+            {
+                id: 'desk',
+                type: 'desk',
+                x: 350, y: 200,
+                width: 260, height: 120,
+                color: '#3e2723',
+                interactive: true,
+                name: 'Biurko',
+                examined: false,
+                onInteract: function(game) {
+                    if (!this.examined) {
+                        this.examined = true;
+                        game.addClue('docs', 'Dokumenty', 'Długi 200,000 zł!', '💰');
+                        game.addClue('polisa', 'Polisa', 'Ubezpieczenie 500,000 zł', '📋');
+                        showNotification('Szokujące odkrycie!');
+                        return 'Dokumenty pokazują desperację finansową!';
+                    }
+                    return 'Biurko właścicielki.';
+                }
+            },
+            {
+                id: 'safe',
+                type: 'furniture',
+                x: 150, y: 400,
+                width: 100, height: 120,
+                color: '#37474f',
+                interactive: true,
+                locked: true,
+                name: 'Sejf',
+                onInteract: function(game) {
+                    if (this.locked) {
+                        const code = prompt('Wprowadź kod (4 cyfry):');
+                        if (code === '2407') {
+                            this.locked = false;
+                            sounds.unlock();
+                            game.addItem('basement_key', 'Klucz do piwnicy', 'Duży klucz', '🔑');
+                            game.addClue('evidence', 'Dowody', 'Dokumenty zbrodni!', '📸');
+                            showNotification('Sejf otwarty!');
+                            game.flags.opened_safe = true;
+                            return 'W sejfie znajdują się dowody!';
+                        } else {
+                            sounds.error();
+                            return 'Nieprawidłowy kod.';
+                        }
+                    }
+                    return 'Sejf otwarty.';
+                }
+            },
+            {
+                id: 'calendar',
+                type: 'decoration',
+                x: 250, y: 100,
+                width: 80, height: 100,
+                color: '#fff',
+                interactive: true,
+                name: 'Kalendarz',
+                examined: false,
+                onInteract: function(game) {
+                    if (!this.examined) {
+                        this.examined = true;
+                        showNotification('24.07 - kod do sejfu?');
+                        return 'Data 24.07 zakreślona!';
+                    }
+                    return 'Kalendarz.';
+                }
+            },
+            {
+                id: 'door_back',
+                type: 'door',
+                x: 850, y: 500,
+                width: 80, height: 140,
+                color: '#8b6f47',
+                interactive: true,
+                destination: 'backroom',
+                name: 'Powrót'
+            }
+        ]
+    },
+
+    basement: {
+        name: 'Piwnica',
+        bgColor: '#0a0a0a',
+        floorColor: '#1a1a1a',
+        objects: [
+            {
+                id: 'shelf',
+                type: 'furniture',
+                x: 700, y: 350,
+                width: 100, height: 180,
+                color: '#5d4037',
+                interactive: true,
+                name: 'Regał',
+                examined: false,
+                onInteract: function(game) {
+                    if (!this.examined) {
+                        this.examined = true;
+                        game.flags.found_hidden = true;
+                        const door = ROOMS.basement.objects.find(o => o.id === 'hidden_door');
+                        if (door) door.locked = false;
+                        sounds.unlock();
+                        showNotification('Ukryte drzwi!');
+                        return 'Regał się przesunął! Ukryte drzwi!';
+                    }
+                    return 'Przesunięty regał.';
+                }
+            },
+            {
+                id: 'hidden_door',
+                type: 'door',
+                x: 820, y: 360,
+                width: 70, height: 120,
+                color: '#2d2d2d',
+                interactive: true,
+                locked: true,
+                destination: 'hidden_room',
+                name: 'Ukryte drzwi',
+                onInteract: function() {
+                    return this.locked ? 'Zamknięte.' : 'Możesz przejść.';
+                }
+            }
+        ]
+    },
+
+    hidden_room: {
+        name: 'Ukryte Pomieszczenie',
+        bgColor: '#050505',
+        floorColor: '#0d0d0d',
+        objects: [
+            {
+                id: 'natalia',
+                type: 'npc',
+                x: 480, y: 360,
+                width: 40, height: 60,
+                color: '#ff6b9d',
+                interactive: true,
+                name: '!!! NATALIA !!!',
+                examined: false,
+                onInteract: function(game) {
+                    if (!this.examined) {
+                        this.examined = true;
+                        sounds.achievement();
+                        game.flags.found_natalia = true;
+                        game.completeObjective('Znajdź Natalię');
+                        showNotification('🎉 NATALIA URATOWANA! 🎉');
+                        setTimeout(() => {
+                            showDialog('GRATULACJE!', '🎉 Ukończyłeś grę! Odkryłeś całą prawdę i uratowałeś Natalię!\n\nWłaścicielka zabiła Martę dla ubezpieczenia i chciała uciszyć Natalię.\n\nDzięki Tobie sprawiedliwość zostanie wymierzona!');
+                        }, 2000);
+                        return 'Natalia jest bezpieczna! Opowiada Ci całą historię...';
+                    }
+                    return 'Natalia jest bezpieczna.';
+                }
+            }
+        ]
+    }
+};
+
+// ==================== DIALOG SYSTEM ====================
+function showDialog(speaker, text) {
+    sounds.interact();
+    const box = document.getElementById('dialog-box');
+    document.getElementById('dialog-speaker').textContent = speaker;
+    document.getElementById('dialog-text').textContent = text;
+    box.classList.add('active');
+    game.state.dialogActive = true;
+}
+
+function hideDialog() {
+    sounds.click();
+    document.getElementById('dialog-box').classList.remove('active');
+    game.state.dialogActive = false;
+}
+
+function showNotification(text) {
+    const notif = document.createElement('div');
+    notif.className = 'notification';
+    notif.textContent = text;
+    document.body.appendChild(notif);
+    setTimeout(() => {
+        if (document.body.contains(notif)) {
+            document.body.removeChild(notif);
+        }
+    }, 2500);
+}
+
+// ==================== GAME CLASS ====================
+class Game {
+    constructor() {
+        this.canvas = document.getElementById('game-canvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.ctx.imageSmoothingEnabled = false;
+
+        this.state = null;
+        this.keys = {};
+        this.interactPressed = false;
+        this.running = false;
+        this.lastTime = 0;
+
+        this.setupInput();
+    }
+
+    setupInput() {
+        document.addEventListener('keydown', (e) => {
+            this.keys[e.key.toLowerCase()] = true;
+
+            if (e.key.toLowerCase() === 'e') {
+                if (!this.interactPressed && !this.state.dialogActive) {
+                    this.interactPressed = true;
+                    this.handleInteraction();
+                } else if (this.state.dialogActive) {
+                    hideDialog();
+                }
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            this.keys[e.key.toLowerCase()] = false;
+            if (e.key.toLowerCase() === 'e') {
+                this.interactPressed = false;
+            }
+        });
+    }
+
+    startNewGame() {
+        sounds.click();
+        document.getElementById('title-screen').style.display = 'none';
+        document.getElementById('game-container').style.display = 'flex';
+
+        this.state = new GameState();
+        this.state.addObjective('Rozejrzyj się po salonie');
+        this.state.addObjective('Znajdź wskazówki o Natalii');
+        this.state.addObjective('Znajdź Natalię');
+
+        showDialog('Narrator', 'Witaj w opuszczonym salonie. Twoja przyjaciółka Natalia zaginęła. Zbadaj salon i odkryj prawdę...');
+
+        this.running = true;
+        this.gameLoop();
+    }
+
+    continueGame() {
+        const saved = localStorage.getItem('nailSalonSave');
+        if (saved) {
+            sounds.click();
+            document.getElementById('title-screen').style.display = 'none';
+            document.getElementById('game-container').style.display = 'flex';
+
+            this.state = new GameState();
+            Object.assign(this.state, JSON.parse(saved));
+            this.state.visitedRooms = new Set(this.state.visitedRooms);
+            this.state.updateUI();
+
+            this.running = true;
+            this.gameLoop();
+        }
+    }
+
+    saveGame() {
+        const saveData = {
+            ...this.state,
+            visitedRooms: Array.from(this.state.visitedRooms)
+        };
+        localStorage.setItem('nailSalonSave', JSON.stringify(saveData));
+        showNotification('💾 Gra zapisana!');
+    }
+
+    handleInteraction() {
+        sounds.interact();
+        const room = ROOMS[this.state.currentRoom];
+        const player = this.state.player;
+
+        room.objects.forEach(obj => {
+            if (!obj.interactive) return;
+
+            const dx = player.x - (obj.x + obj.width/2);
+            const dy = player.y - (obj.y + obj.height/2);
+            const distance = Math.sqrt(dx*dx + dy*dy);
+
+            if (distance < 100) {
+                if (obj.type === 'door' || obj.destination) {
+                    if (!obj.locked) {
+                        sounds.doorOpen();
+                        this.changeRoom(obj.destination);
+                    } else {
+                        const msg = obj.onInteract ? obj.onInteract(this.state) : 'Zamknięte.';
+                        if (msg) showDialog(obj.name, msg);
+                    }
+                } else if (obj.onInteract) {
+                    const msg = obj.onInteract(this.state);
+                    if (msg) showDialog(obj.name, msg);
+                }
+            }
+        });
+    }
+
+    changeRoom(roomId) {
+        this.state.currentRoom = roomId;
+        this.state.player.x = 480;
+        this.state.player.y = 400;
+        this.state.visitedRooms.add(roomId);
+        this.state.updateUI();
+        this.saveGame();
+    }
+
+    update(dt) {
+        if (this.state.dialogActive) return;
+
+        const player = this.state.player;
+        let moving = false;
+
+        if (this.keys['w'] || this.keys['arrowup']) {
+            player.y -= 4;
+            player.direction = 'up';
+            moving = true;
+        }
+        if (this.keys['s'] || this.keys['arrowdown']) {
+            player.y += 4;
+            player.direction = 'down';
+            moving = true;
+        }
+        if (this.keys['a'] || this.keys['arrowleft']) {
+            player.x -= 4;
+            player.direction = 'left';
+            moving = true;
+        }
+        if (this.keys['d'] || this.keys['arrowright']) {
+            player.x += 4;
+            player.direction = 'right';
+            moving = true;
+        }
+
+        if (moving) {
+            player.animTimer++;
+            if (player.animTimer > 8) {
+                player.animTimer = 0;
+                player.animFrame = (player.animFrame + 1) % 4;
+
+                // Footstep sound
+                this.state.footstepTimer++;
+                if (this.state.footstepTimer > 15) {
+                    sounds.footstep();
+                    this.state.footstepTimer = 0;
+                }
+            }
+        } else {
+            player.animFrame = 0;
+        }
+
+        player.x = Math.max(50, Math.min(910, player.x));
+        player.y = Math.max(50, Math.min(670, player.y));
+
+        // Collision & indicators
+        const room = ROOMS[this.state.currentRoom];
+        room.objects.forEach(obj => {
+            if (obj.type !== 'door') {
+                const buffer = 20;
+                if (player.x > obj.x - buffer &&
+                    player.x < obj.x + obj.width + buffer &&
+                    player.y > obj.y - buffer &&
+                    player.y < obj.y + obj.height + buffer) {
+
+                    if (player.y < obj.y + obj.height/2) player.y = obj.y - buffer;
+                    else player.y = obj.y + obj.height + buffer;
+                }
+            }
+
+            const dx = player.x - (obj.x + obj.width/2);
+            const dy = player.y - (obj.y + obj.height/2);
+            obj.showIndicator = obj.interactive && Math.sqrt(dx*dx + dy*dy) < 100;
+        });
+    }
+
+    render() {
+        const ctx = this.ctx;
+        const room = ROOMS[this.state.currentRoom];
+
+        ctx.fillStyle = room.bgColor;
+        ctx.fillRect(0, 0, 960, 720);
+
+        ctx.fillStyle = room.floorColor;
+        ctx.fillRect(0, 0, 960, 720);
+
+        // Grid
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+        ctx.lineWidth = 1;
+        for (let x = 0; x < 960; x += 48) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, 720);
+            ctx.stroke();
+        }
+        for (let y = 0; y < 720; y += 48) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(960, y);
+            ctx.stroke();
+        }
+
+        // Objects behind
+        room.objects
+            .filter(obj => obj.y + obj.height/2 < this.state.player.y)
+            .forEach(obj => SpriteRenderer.drawObject(ctx, obj));
+
+        // Player
+        SpriteRenderer.drawPlayer(
+            ctx,
+            this.state.player.x,
+            this.state.player.y,
+            this.state.player.direction,
+            this.state.player.animFrame
+        );
+
+        // Objects in front
+        room.objects
+            .filter(obj => obj.y + obj.height/2 >= this.state.player.y)
+            .forEach(obj => SpriteRenderer.drawObject(ctx, obj));
+
+        // Room name
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.fillRect(0, 0, 960, 50);
+        ctx.fillStyle = '#5dade2';
+        ctx.font = 'bold 24px Courier';
+        ctx.textAlign = 'center';
+        ctx.fillText(room.name, 480, 32);
+    }
+
+    gameLoop(timestamp = 0) {
+        if (!this.running) return;
+
+        const dt = Math.min((timestamp - this.lastTime) / 1000, 0.1);
+        this.lastTime = timestamp;
+
+        this.update(dt);
+        this.render();
+
+        requestAnimationFrame((t) => this.gameLoop(t));
+    }
+}
+
+let game;
+
+window.addEventListener('load', () => {
+    game = new Game();
+
+    document.getElementById('btn-new-game').addEventListener('click', () => {
+        game.startNewGame();
+    });
+
+    document.getElementById('btn-continue').addEventListener('click', () => {
+        game.continueGame();
+    });
+
+    if (localStorage.getItem('nailSalonSave')) {
+        document.getElementById('btn-continue').disabled = false;
+    }
+});
+    </script>
+</body>
+</html>
