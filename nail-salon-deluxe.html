@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>💅 Salon Paznokci: Deluxe Edition - Tajemnica Zaginionej</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a0f;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+        }
+
+        #game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+            position: relative;
+        }
+
+        #game-canvas {
+            border: 6px solid #1a4d7a;
+            box-shadow:
+                0 0 40px rgba(26, 77, 122, 0.5),
+                inset 0 0 20px rgba(0, 0, 0, 0.3);
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+            background: #000;
+        }
+
+        /* UI Panels */
+        .ui-panel {
+            position: absolute;
+            background: linear-gradient(135deg, rgba(10, 20, 40, 0.95), rgba(20, 30, 50, 0.95));
+            border: 3px solid #2a5d8a;
+            border-radius: 8px;
+            padding: 15px;
+            color: #fff;
+            box-shadow: 0 5px 25px rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+        }
+
+        #objectives-panel {
+            top: 20px;
+            left: 20px;
+            min-width: 300px;
+            max-width: 350px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        #inventory-panel {
+            top: 20px;
+            right: 20px;
+            min-width: 280px;
+            max-width: 320px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        #journal-panel {
+            bottom: 120px;
+            right: 20px;
+            min-width: 320px;
+            max-height: 300px;
+            overflow-y: auto;
+            display: none;
+        }
+
+        #journal-panel.active {
+            display: block;
+        }
+
+        #stats-panel {
+            bottom: 20px;
+            left: 20px;
+            min-width: 250px;
+        }
+
+        .panel-header {
+            color: #5dade2;
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            border-bottom: 2px solid #2a5d8a;
+            padding-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .objective-item {
+            padding: 8px;
+            margin: 6px 0;
+            background: rgba(93, 173, 226, 0.1);
+            border-left: 4px solid #5dade2;
+            font-size: 13px;
+            line-height: 1.5;
+            transition: all 0.3s;
+        }
+
+        .objective-item:hover {
+            background: rgba(93, 173, 226, 0.2);
+            transform: translateX(3px);
+        }
+
+        .objective-item.completed {
+            opacity: 0.5;
+            text-decoration: line-through;
+            border-left-color: #27ae60;
+        }
+
+        .inventory-item {
+            padding: 10px;
+            margin: 6px 0;
+            background: linear-gradient(135deg, rgba(155, 89, 182, 0.2), rgba(142, 68, 173, 0.3));
+            border: 2px solid #8e44ad;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .inventory-item:hover {
+            background: linear-gradient(135deg, rgba(155, 89, 182, 0.4), rgba(142, 68, 173, 0.5));
+            transform: scale(1.02);
+        }
+
+        .inventory-item .icon {
+            font-size: 20px;
+        }
+
+        .inventory-item .details {
+            flex: 1;
+        }
+
+        .inventory-item .name {
+            font-weight: bold;
+            color: #e74c3c;
+        }
+
+        .inventory-item .desc {
+            font-size: 11px;
+            color: #bdc3c7;
+            margin-top: 3px;
+        }
+
+        .clue-item {
+            background: linear-gradient(135deg, rgba(52, 152, 219, 0.2), rgba(41, 128, 185, 0.3));
+            border-color: #3498db;
+        }
+
+        .clue-item:hover {
+            background: linear-gradient(135deg, rgba(52, 152, 219, 0.4), rgba(41, 128, 185, 0.5));
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 13px;
+        }
+
+        .stat-label {
+            color: #95a5a6;
+        }
+
+        .stat-value {
+            color: #f39c12;
+            font-weight: bold;
+        }
+
+        /* Dialog Box */
+        #dialog-box {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 85%;
+            max-width: 700px;
+            background: linear-gradient(135deg, rgba(10, 20, 40, 0.98), rgba(20, 30, 50, 0.98));
+            border: 4px solid #e74c3c;
+            border-radius: 12px;
+            padding: 25px;
+            color: #fff;
+            box-shadow: 0 10px 50px rgba(0, 0, 0, 0.9);
+            display: none;
+            backdrop-filter: blur(10px);
+        }
+
+        #dialog-box.active {
+            display: block;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+
+        #dialog-speaker {
+            color: #e74c3c;
+            font-weight: bold;
+            font-size: 18px;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        #dialog-text {
+            font-size: 15px;
+            line-height: 1.8;
+            color: #ecf0f1;
+        }
+
+        #dialog-choices {
+            margin-top: 15px;
+            display: none;
+        }
+
+        #dialog-choices.active {
+            display: block;
+        }
+
+        .dialog-choice {
+            padding: 12px;
+            margin: 8px 0;
+            background: rgba(52, 152, 219, 0.2);
+            border: 2px solid #3498db;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .dialog-choice:hover {
+            background: rgba(52, 152, 219, 0.4);
+            transform: translateX(5px);
+            border-color: #5dade2;
+        }
+
+        .dialog-continue {
+            position: absolute;
+            bottom: 8px;
+            right: 15px;
+            color: #95a5a6;
+            font-size: 12px;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        /* Title Screen */
+        #title-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 50%, #0f3460 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            animation: backgroundShift 10s ease infinite;
+        }
+
+        @keyframes backgroundShift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        #title-screen h1 {
+            color: #e74c3c;
+            font-size: 56px;
+            margin-bottom: 10px;
+            text-shadow:
+                3px 3px 0px #000,
+                0 0 20px rgba(231, 76, 60, 0.5);
+            animation: titleGlow 2s ease-in-out infinite;
+        }
+
+        @keyframes titleGlow {
+            0%, 100% { text-shadow: 3px 3px 0px #000, 0 0 20px rgba(231, 76, 60, 0.5); }
+            50% { text-shadow: 3px 3px 0px #000, 0 0 40px rgba(231, 76, 60, 0.8); }
+        }
+
+        #title-screen h2 {
+            color: #fff;
+            font-size: 28px;
+            margin-bottom: 15px;
+            text-shadow: 2px 2px 0px #000;
+        }
+
+        #title-screen .edition {
+            color: #f39c12;
+            font-size: 20px;
+            margin-bottom: 50px;
+            text-shadow: 1px 1px 0px #000;
+        }
+
+        .menu-button {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: #fff;
+            border: none;
+            padding: 18px 50px;
+            font-size: 20px;
+            font-family: 'Courier New', monospace;
+            cursor: pointer;
+            margin: 12px;
+            transition: all 0.3s;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .menu-button:hover {
+            background: linear-gradient(135deg, #ff5544, #e74c3c);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(231, 76, 60, 0.4);
+        }
+
+        .menu-button:active {
+            transform: translateY(-1px);
+        }
+
+        .menu-button:disabled {
+            background: #7f8c8d;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Notifications */
+        .notification {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(135deg, rgba(231, 76, 60, 0.98), rgba(192, 57, 43, 0.98));
+            color: #fff;
+            padding: 25px 50px;
+            border: 4px solid #fff;
+            border-radius: 12px;
+            font-size: 20px;
+            font-weight: bold;
+            z-index: 1500;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
+            animation: notificationPop 2.5s ease-in-out;
+        }
+
+        @keyframes notificationPop {
+            0%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+            10%, 90% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        }
+
+        /* Mini-game overlay */
+        #minigame-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        #minigame-overlay.active {
+            display: flex;
+        }
+
+        #minigame-container {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            border: 5px solid #3498db;
+            border-radius: 15px;
+            padding: 30px;
+            max-width: 600px;
+            width: 90%;
+        }
+
+        .minigame-title {
+            color: #3498db;
+            font-size: 24px;
+            text-align: center;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+        }
+
+        /* Controls Info */
+        #controls-info {
+            position: absolute;
+            top: 50%;
+            left: 20px;
+            transform: translateY(-50%);
+            background: rgba(10, 20, 40, 0.9);
+            border: 2px solid #2a5d8a;
+            border-radius: 8px;
+            padding: 15px;
+            font-size: 12px;
+        }
+
+        .control-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 5px 0;
+            color: #bdc3c7;
+        }
+
+        .key-btn {
+            background: linear-gradient(135deg, #34495e, #2c3e50);
+            color: #3498db;
+            border: 2px solid #2a5d8a;
+            border-radius: 4px;
+            padding: 5px 10px;
+            font-weight: bold;
+            min-width: 35px;
+            text-align: center;
+        }
+
+        /* Scrollbar styling */
+        .ui-panel::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .ui-panel::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+        }
+
+        .ui-panel::-webkit-scrollbar-thumb {
+            background: #2a5d8a;
+            border-radius: 4px;
+        }
+
+        .ui-panel::-webkit-scrollbar-thumb:hover {
+            background: #3498db;
+        }
+
+        /* Achievement popup */
+        .achievement-popup {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #f39c12, #e67e22);
+            border: 3px solid #fff;
+            border-radius: 10px;
+            padding: 15px 25px;
+            color: #fff;
+            font-weight: bold;
+            z-index: 1600;
+            animation: achievementSlide 4s ease-in-out;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        @keyframes achievementSlide {
+            0%, 100% { opacity: 0; transform: translateX(400px); }
+            10%, 90% { opacity: 1; transform: translateX(0); }
+        }
+
+        .achievement-icon {
+            font-size: 24px;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Title Screen -->
+    <div id="title-screen">
+        <h1>💅 SALON PAZNOKCI 💅</h1>
+        <h2>Tajemnica Zaginionej</h2>
+        <div class="edition">★ DELUXE EDITION ★</div>
+        <button class="menu-button" onclick="game.startNewGame()">NOWA GRA</button>
+        <button class="menu-button" onclick="game.continueGame()" id="continue-btn" disabled>KONTYNUUJ</button>
+        <button class="menu-button" onclick="game.showCredits()">O GRZE</button>
+    </div>
+
+    <!-- Game Container -->
+    <div id="game-container">
+        <canvas id="game-canvas" width="960" height="720"></canvas>
+
+        <!-- Objectives Panel -->
+        <div class="ui-panel" id="objectives-panel">
+            <div class="panel-header">
+                <span>🎯</span> CELE
+            </div>
+            <div id="objectives-list"></div>
+        </div>
+
+        <!-- Inventory Panel -->
+        <div class="ui-panel" id="inventory-panel">
+            <div class="panel-header">
+                <span>🎒</span> EKWIPUNEK & WSKAZÓWKI
+            </div>
+            <div id="inventory-list"></div>
+        </div>
+
+        <!-- Journal Panel -->
+        <div class="ui-panel" id="journal-panel">
+            <div class="panel-header">
+                <span>📖</span> DZIENNIK ŚLEDCZEGO
+            </div>
+            <div id="journal-content"></div>
+        </div>
+
+        <!-- Stats Panel -->
+        <div class="ui-panel" id="stats-panel">
+            <div class="panel-header">
+                <span>📊</span> STATYSTYKI
+            </div>
+            <div id="stats-content">
+                <div class="stat-row">
+                    <span class="stat-label">Wskazówki:</span>
+                    <span class="stat-value" id="stat-clues">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Przedmioty:</span>
+                    <span class="stat-value" id="stat-items">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Pokoje:</span>
+                    <span class="stat-value" id="stat-rooms">0/15</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Osiągnięcia:</span>
+                    <span class="stat-value" id="stat-achievements">0/20</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls Info -->
+        <div id="controls-info">
+            <div class="control-row">
+                <span class="key-btn">WSAD</span>
+                <span>Ruch</span>
+            </div>
+            <div class="control-row">
+                <span class="key-btn">E</span>
+                <span>Interakcja</span>
+            </div>
+            <div class="control-row">
+                <span class="key-btn">I</span>
+                <span>Ekwipunek</span>
+            </div>
+            <div class="control-row">
+                <span class="key-btn">J</span>
+                <span>Dziennik</span>
+            </div>
+            <div class="control-row">
+                <span class="key-btn">ESC</span>
+                <span>Menu</span>
+            </div>
+        </div>
+
+        <!-- Dialog Box -->
+        <div id="dialog-box">
+            <div id="dialog-speaker"></div>
+            <div id="dialog-text"></div>
+            <div id="dialog-choices"></div>
+            <div class="dialog-continue">▶ Naciśnij E aby kontynuować...</div>
+        </div>
+    </div>
+
+    <!-- Mini-game Overlay -->
+    <div id="minigame-overlay">
+        <div id="minigame-container">
+            <div class="minigame-title" id="minigame-title">MINI-GRA</div>
+            <div id="minigame-content"></div>
+        </div>
+    </div>
+
+    <script>
+// Cała gra będzie tutaj...
+    </script>
+</body>
+</html>
