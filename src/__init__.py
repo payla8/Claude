@@ -1,0 +1,2 @@
+"""Crypto Investment AI Bot - Advanced Multi-Agent Trading System"""
+__version__ = "1.0.0"

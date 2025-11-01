@@ -1,0 +1,106 @@
+trading:
+  mode: paper  # paper or live
+  exchanges:
+    - binance
+    - coinbase
+  symbols:
+    - BTC/USDT
+    - ETH/USDT
+    - BNB/USDT
+    - SOL/USDT
+    - ADA/USDT
+  timeframes:
+    - 1m
+    - 5m
+    - 15m
+    - 1h
+    - 4h
+    - 1d
+
+capital:
+  initial: 10000
+  max_position_size: 0.2  # 20% of portfolio per trade
+  reserve: 0.1  # Keep 10% in reserve
+
+risk_management:
+  max_risk_per_trade: 0.02  # 2% max loss per trade
+  max_daily_loss: 0.05  # 5% max daily loss
+  max_drawdown: 0.15  # 15% max drawdown
+  stop_loss_percentage: 0.03
+  take_profit_percentage: 0.06
+  trailing_stop: true
+  trailing_stop_percentage: 0.02
+
+strategies:
+  enabled:
+    - trend_following
+    - mean_reversion
+    - breakout
+    - scalping
+    - arbitrage
+    - ml_prediction
+  weights:
+    trend_following: 0.25
+    mean_reversion: 0.20
+    breakout: 0.15
+    scalping: 0.10
+    arbitrage: 0.10
+    ml_prediction: 0.20
+
+technical_indicators:
+  moving_averages:
+    - SMA_20
+    - SMA_50
+    - SMA_200
+    - EMA_12
+    - EMA_26
+  oscillators:
+    - RSI
+    - MACD
+    - Stochastic
+    - CCI
+    - Williams_R
+  volatility:
+    - Bollinger_Bands
+    - ATR
+    - Keltner_Channel
+  volume:
+    - OBV
+    - CMF
+    - VWAP
+  momentum:
+    - ADX
+    - Momentum
+    - ROC
+
+ml_models:
+  use_lstm: true
+  use_transformer: true
+  use_ensemble: true
+  prediction_horizon: 24  # hours
+  retrain_frequency: 168  # hours (1 week)
+  min_training_samples: 10000
+
+sentiment_analysis:
+  enabled: true
+  sources:
+    - twitter
+    - reddit
+    - news
+  update_frequency: 300  # seconds
+  sentiment_weight: 0.15
+
+backtesting:
+  enabled: true
+  start_date: 2020-01-01
+  end_date: 2024-01-01
+  commission: 0.001  # 0.1%
+  slippage: 0.0005  # 0.05%
+
+monitoring:
+  log_level: INFO
+  enable_prometheus: true
+  prometheus_port: 9090
+  enable_telegram: false
+  alert_on_errors: true
+  alert_on_trades: true
