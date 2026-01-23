@@ -93,10 +93,12 @@ def is_valid_digital_product(name: str) -> bool:
         if re.search(pattern, name_lower):
             return False
 
-    # Exclude hardware/physical products AND gift cards
+    # Exclude hardware/physical products, gift cards, AND subscriptions
     exclude_patterns = [
+        # Hardware & Accessories
         r"\bconsole\b",
         r"\bcontroller\b",
+        r"\bjoy-?con\b",  # Nintendo controllers
         r"\bheadset\b",
         r"\bheadphones\b",
         r"\bcable\b",
@@ -112,6 +114,7 @@ def is_valid_digital_product(name: str) -> bool:
         r"\bssd\b",
         r"memory\s*card",
         r"\bsd\s*card\b",
+        r"micro\s*sd",
         r"\bamiibo\b",
         r"\bfigure\b",
         r"\bcollectible\b",
@@ -127,7 +130,7 @@ def is_valid_digital_product(name: str) -> bool:
         r"\bmonitor\b",
         r"\bchair\b",
         r"\bdesk\b",
-        # Gift cards - can't purchase with GameStop cards
+        # Gift cards & Currency - can't purchase with GameStop cards
         r"\bgift\s*card\b",
         r"\bpsn\s*card\b",
         r"\bxbox\s*gift\b",
@@ -139,6 +142,15 @@ def is_valid_digital_product(name: str) -> bool:
         r"\bwallet\s*card\b",
         r"\bdigital\s*card\b",
         r"\bcurrency\s*card\b",
+        # Subscriptions & Memberships - can't purchase with gift cards
+        r"game\s*pass",
+        r"xbox\s*live",
+        r"ps\s*plus",
+        r"playstation\s*plus",
+        r"nintendo\s*online",
+        r"membership",
+        r"subscription",
+        r"\bea\s*play\b",
     ]
 
     for pattern in exclude_patterns:
