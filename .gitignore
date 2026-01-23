@@ -1,0 +1,76 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+venv_py312/
+ENV/
+env/
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+nul
+
+# Data files
+*.xlsx
+*.tsv
+*.json
+!render.yaml
+
+# Logs
+*.log
+
+# Temporary
+*.tmp
+*.bak
+
+# Specific project files
+gamivo_offers_*/
+final_kinguin_offers/
+example-Yuumi/
+SpectralNails/
+ngrok.exe
+test_*.py
+debug_*.py
+check_*.py
+parse_*.py
+analyze_*.py
+find_*.py
+match_*.py
+process_*.py
+download_*.py
+inspect_*.py
+verify_*.py
+order_*.py
+steam_*.py
+steamdb_*.py
+king_*.py
+kinguin-proxy.js
+kinguin_proxy.py
+*.ps1
+historical_*
+add_*
+update_*
+BOTOFFER.py
+MATCH.py
+King*.py
+
+# Keep only the scraper files
+!gamestop_scraper_api.py
+!gamestop_scraper.html
+!gamestop_requirements.txt
+!render.yaml
+!README.md
