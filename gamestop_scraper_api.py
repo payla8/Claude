@@ -398,7 +398,9 @@ async def scrape_products(
             "usdEurRate": usd_eur_rate,
             "discountRate": discount_rate,
             "source": "Constructor.io API (Video Games with Condition=Digital filter)",
-            "note": "PlayStation digital products not available on GameStop"
+            "note": "PlayStation digital products not available on GameStop",
+            "priceWarning": "IMPORTANT: Prices from Constructor API may be outdated. Always verify prices on GameStop.com before purchasing. Some prices may differ by $5-10 from current GameStop prices.",
+            "recommendation": "Click product URLs to verify current prices on GameStop before making purchase decisions"
         }
     }
 
