@@ -149,10 +149,8 @@ def is_valid_digital_product(name: str) -> bool:
 
 
 def fetch_digital_products(page: int, sort_by: str = "popularity") -> dict:
-    """Fetch ONLY digital products using the digital-store group (more complete than condition filter)"""
-    # Using digital-store group instead of condition=Digital filter
-    # digital-store has 4824 products vs 3011 with condition filter
-    # This includes products like FC 26 Xbox that are missing from condition filter
+    """Fetch digital products from digital-store group with strict filtering"""
+    # Using digital-store group but with STRICT filtering to exclude pre-owned
     url = f"{CONSTRUCTOR_BASE}/browse/group_id/digital-store"
 
     params = {
@@ -176,6 +174,16 @@ def parse_constructor_product(item: dict) -> Dict[str, Any]:
     """Parse a product from Constructor.io browse response"""
     data = item.get('data', {})
     name = item.get('value', '') or data.get('product_name', '')
+
+    # CRITICAL: Check condition field to exclude pre-owned products
+    condition = str(data.get('condition', '')).lower()
+    if 'pre' in condition or 'owned' in condition or 'used' in condition or 'refurb' in condition:
+        return None  # Skip pre-owned products
+
+    # Also check name for pre-owned indicators
+    name_lower = name.lower()
+    if 'pre-owned' in name_lower or 'preowned' in name_lower or 'pre owned' in name_lower:
+        return None  # Skip pre-owned products
 
     # Get prices
     regular_price = parse_price(data.get('price'))
@@ -208,6 +216,7 @@ def parse_constructor_product(item: dict) -> Dict[str, Any]:
         'url': url,
         'imageUrl': data.get('image_url', ''),
         'edition': data.get('edition', ''),
+        'condition': data.get('condition', 'Digital'),  # Add condition field
     }
 
 
@@ -285,7 +294,7 @@ async def scrape_products(
     max_page = max_pages if max_pages > 0 else 100  # Safety limit
     total_available = 0
 
-    print(f"\n=== Scraping Digital Products (condition=Digital) ===")
+    print(f"\n=== Scraping Digital Products (Condition=Digital filter - excludes pre-owned) ===")
 
     while page <= max_page:
         data = fetch_digital_products(page, sort_by="popularity")
@@ -313,6 +322,10 @@ async def scrape_products(
 
         for item in results:
             product = parse_constructor_product(item)
+
+            # Skip if product is None (pre-owned/used product)
+            if product is None:
+                continue
 
             # Validate it's a real digital product (not hardware or gift cards)
             if product.get('name') and is_valid_digital_product(product['name']):
@@ -372,7 +385,7 @@ async def scrape_products(
             "totalAvailable": total_available,
             "usdEurRate": usd_eur_rate,
             "discountRate": discount_rate,
-            "source": "Constructor.io API (digital-store group, sorted by popularity)",
+            "source": "Constructor.io API (Video Games with Condition=Digital filter)",
             "note": "PlayStation digital products not available on GameStop"
         }
     }
