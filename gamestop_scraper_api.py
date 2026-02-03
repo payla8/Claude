@@ -15,7 +15,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 import os
 
-app = FastAPI(title="GameStop Scraper API", version="4.0.0")
+app = FastAPI(title="GameStop Scraper API", version="4.0.1")
 
 # Enable CORS for frontend access
 app.add_middleware(
