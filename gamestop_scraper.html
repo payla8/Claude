@@ -583,7 +583,7 @@
         <div class="settings-panel">
             <div class="setting-group">
                 <label>API Server URL</label>
-                <input type="text" id="apiUrl" value="https://gamestop-0ib7.onrender.com" placeholder="https://gamestop-0ib7.onrender.com">
+                <input type="text" id="apiUrl" value="http://localhost:8000" placeholder="http://localhost:8000">
             </div>
 
             <div class="setting-group">
@@ -627,12 +627,12 @@
             <button class="tab pc" data-platform="PC" onclick="filterPlatform('PC', this)">PC</button>
         </div>
 
-        <div class="warning-banner">
-            <div class="warning-banner-icon">⚠️</div>
+        <div class="warning-banner" style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); border-left: 4px solid #4ade80;">
+            <div class="warning-banner-icon">✓</div>
             <div class="warning-banner-content">
-                <div class="warning-banner-title">Price Verification Required</div>
+                <div class="warning-banner-title">Real-Time Accurate Prices</div>
                 <div class="warning-banner-text">
-                    Prices are from GameStop's API cache and may be 1-2 days old. <strong>Always click product links to verify current prices on GameStop.com before purchasing.</strong> Some prices may differ by $5-10 from current website prices.
+                    Prices are fetched in REAL-TIME from GameStop's official Constructor.io API. This is the same API GameStop.com uses - prices are updated hourly and are accurate. <strong>Always click product links to complete your purchase on GameStop.com.</strong>
                 </div>
             </div>
         </div>

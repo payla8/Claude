@@ -14,8 +14,15 @@ import re
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import os
+import os
+import undetected_chromedriver as uc
+import asyncio
+from selenium.webdriver.common.by import By
 
 app = FastAPI(title="GameStop Scraper API", version="4.0.0")
+
+# Lock for browser access
+browser_lock = asyncio.Lock()
 
 # Enable CORS for frontend access
 app.add_middleware(
@@ -45,6 +52,23 @@ HEADERS = {
     "Origin": "https://www.gamestop.com",
     "Referer": "https://www.gamestop.com/",
 }
+
+# Chrome Driver instance
+driver = None
+
+def get_driver():
+    global driver
+    if driver is None:
+        print("Initializing Chrome Driver...")
+        options = uc.ChromeOptions()
+        options.add_argument('--incognito')
+        options.add_argument('--disable-blink-features=AutomationControlled')
+        # options.add_argument('--headless=new') # Headless often detects as bot, keep headful but minimized if possible
+        # User requested "real website", showing the browser might be reassuring or annoying. 
+        # Let's keep it visible for debug, user can minimize.
+        # options.add_argument('--start-minimized') 
+        driver = uc.Chrome(options=options)
+    return driver
 
 
 def detect_platform(product_name: str, product_id: str = "") -> str:
@@ -578,6 +602,304 @@ async def get_allkeyshop_price(
         return {"error": f"Request failed: {str(e)}", "url": url}
     except Exception as e:
         return {"error": f"Scraping failed: {str(e)}", "url": url}
+
+
+@app.get("/verify-price")
+async def verify_price(
+    url: str = Query(..., description="GameStop product URL to verify"),
+):
+    """
+    Verify/Fetch LIVE price from GameStop product page using CloudScraper.
+    Bypasses cache and fetches what you actually see on the page.
+    """
+    global driver
+    if not url:
+        return {"error": "URL required"}
+
+    print(f"Verifying live price for: {url}")
+    
+    # Ensure we use production URL
+    if 'sfcc-stg.gamestop.com' in url:
+        url = url.replace('sfcc-stg.gamestop.com', 'www.gamestop.com')
+        print(f"Corrected URL to: {url}")
+    
+    async with browser_lock:
+        # Retry loop for driver stability
+        for attempt in range(3):
+            try:
+                # Use undetected_chromedriver
+                driver = get_driver()
+                
+                # Check if driver is actually alive
+                try:
+                    # Simple check to see if we can communicate
+                    if not driver.service.process.poll() is None:
+                        raise Exception("Driver process terminated")
+                    _ = driver.current_url 
+                except Exception:
+                   print("Driver dead or unresponsive, restarting...")
+                   if driver:
+                       try: driver.quit()
+                       except: pass
+                   driver = None
+                   time.sleep(1) # Wait before retry
+                   driver = get_driver()
+
+                # Navigate to page
+                print(f"Navigating to {url}...")
+                driver.get(url)
+                # Removed break - proceed to scraping logic
+            except Exception as e:
+                print(f"Attempt {attempt+1} failed: {e}")
+                # Reset driver
+                if driver:
+                    try: driver.quit()
+                    except: pass
+                driver = None
+                time.sleep(2) # Backoff
+                
+                if attempt == 2: # Last attempt
+                    return {"status": "error", "message": f"Browser Error: {str(e)}"}
+                continue # Try next attempt
+            
+            # Wait for some content to load (price)
+            # We can wait for a generic element or just sleep briefly
+            time.sleep(3) # Wait for JS to render
+            
+            # --- DIGITAL SELECTION LOGIC ---
+            # Try to find and click "Digital" format
+            is_digital_confirmed = False
+            try:
+                print("Checking for Digital format...")
+                
+                # Check 1: Is it already digital? (URL often contains 'digital' or 'standard-edition' but not 'physical')
+                # But better to check UI elements.
+                
+                # Look for buttons/labels with "Digital" text
+                # XPath to find elements with text 'Digital' that are likely buttons or selectors
+                digital_elems = driver.find_elements(By.XPATH, "//*[contains(text(), 'Digital')]")
+                
+                clicked_digital = False
+                for elem in digital_elems:
+                    try:
+                        # Check if it's a clickable option (e.g., inside a button, label, or div with class attributes)
+                        tag = elem.tag_name.lower()
+                        parent = elem.find_element(By.XPATH, "..")
+                        
+                        # Heuristic: verify it's part of a selection group
+                        if tag in ['button', 'label', 'span', 'div'] and elem.is_displayed():
+                            # Check if already selected
+                            # GameStop often uses 'selected' class on the container or element
+                            classes = elem.get_attribute('class') or ''
+                            parent_classes = parent.get_attribute('class') or ''
+                            
+                            is_selected = 'selected' in classes.lower() or 'selected' in parent_classes.lower()
+                            
+                            if is_selected:
+                                print("Digital format already selected.")
+                                is_digital_confirmed = True
+                                break
+                            
+                            # If not selected, try to click
+                            # Prefer elements that look like buttons
+                            if not clicked_digital:
+                                print(f"Clicking Digital option ({tag})...")
+                                driver.execute_script("arguments[0].click();", elem) # Force click
+                                time.sleep(2) # Wait for update
+                                clicked_digital = True
+                                is_digital_confirmed = True
+                                break
+                    except:
+                        continue
+                        
+                if not is_digital_confirmed:
+                    # Maybe it's a "Digital Only" page? 
+                    # If there are no Physical options, assume it's digital if the title/breadcrumbs say so
+                    page_text = driver.find_element(By.TAG_NAME, "body").text
+                    if "Format: Digital" in page_text or "Platform: Digital" in page_text:
+                        is_digital_confirmed = True
+                        print("Confirmed Digital by page text.")
+            
+            except Exception as e:
+                print(f"Digital check warning: {e}")
+
+            if not is_digital_confirmed:
+                print("Could not confirm Digital format. Skipping.")
+                return {
+                    "status": "error", 
+                    "message": "Skipped: format is not Digital",
+                    "code": "NOT_DIGITAL"
+                }
+
+            html = driver.page_source
+            
+            # --- PRICE EXTRACTION LOGIC ---
+            regular_price = None
+            pro_price = None
+            
+            # Strategy 1: "Digital" Condition Tile Price (High Accuracy for Digital Items)
+            # The user text shows "Condition Digital $16.62".
+            try:
+                # Look for the container that represents the Digital option
+                # It usually contains the text "Digital" and a price
+                digital_labels = driver.find_elements(By.XPATH, "//*[contains(text(), 'Digital')]")
+                
+                for label in digital_labels:
+                    try:
+                        # Check parent/ancestor for the tile container
+                        # usually a label, button, or div with class 'attribute' or 'value'
+                        parent = label.find_element(By.XPATH, "./..")
+                        grandparent = parent.find_element(By.XPATH, "./..")
+                        
+                        # Get text of the block
+                        block_text = grandparent.text.replace("\n", " ").strip()
+                        
+                        # Look for price in this block
+                        # Pattern: "Digital $16.62" or "Digital ... $16.62"
+                        if "Digital" in block_text:
+                            match = re.search(r'\$?([0-9]+\.[0-9]{2})', block_text)
+                            if match:
+                                val = float(match.group(1))
+                                # Sanity check: is it in a realistic range?
+                                if 0 < val < 200:
+                                    print(f"Found Price in Digital Tile: {val}")
+                                    # This is likely the 'effective' price (Pro price if logged in/visible, or just sale)
+                                    # We treat this as a strong candidate for Pro Price if it matches 'for Pros' context
+                                    # But let's verify if there is a separate 'Regular' price
+                                    
+                                    # If we find this, it's often the 'Pro' price because scraping defaults to best offer?
+                                    # Or is it just the current price?
+                                    # Let's verify against 'for Pros' text to be sure.
+                                    # For now, store it as a potential Pro Price candidate
+                                    if pro_price is None: 
+                                        pro_price = val
+                    except:
+                        continue
+            except Exception as e:
+                print(f"Digital Tile scan error: {e}")
+
+            # Strategy 2: Explicit "For Pros" Text (Specific)
+            try:
+                # Use XPath to find text containing "Pros"
+                # Use a broader search
+                pro_elements = driver.find_elements(By.XPATH, "//*[contains(text(), 'Pros')]")
+                for el in pro_elements:
+                    if el.is_displayed():
+                        text = el.text.strip().replace("\n", " ") 
+                        # Regex: "$16.62 for Pros" or "for Pros" near price
+                        # Relaxed: Price ... for Pros OR Pros ... Price
+                        
+                        # Type A: "$16.62 for Pros"
+                        match = re.search(r'\$?([0-9]+\.[0-9]{2})\s*(?:for)?\s*Pros', text, re.IGNORECASE)
+                        if match:
+                            val = float(match.group(1))
+                            print(f"Found Explicit Pro Price (Type A): {val}")
+                            pro_price = val
+                            break
+                            
+                        # Type B: Parent container has both?
+                        parent = el.find_element(By.XPATH, "..")
+                        p_text = parent.text.replace("\n", " ")
+                        match = re.search(r'\$?([0-9]+\.[0-9]{2})\s*(?:for)?\s*Pros', p_text, re.IGNORECASE)
+                        if match:
+                            val = float(match.group(1))
+                            print(f"Found Explicit Pro Price (Type B): {val}")
+                            pro_price = val
+                            break
+            except Exception as e:
+                pass
+
+            # Strategy 3: Standard/Main Price (Regular)
+            try:
+                # Selectors for the main displayed price (crossed out or main)
+                # If we have a 'Pro' price, the other price is likely the regular one.
+                # .actual-price often shows the 'sale' price, which might be the Pro price.
+                # We need to find the HIGHER price if we have a lower Pro price?
+                
+                price_selectors = [".actual-price", ".price-sales", "span[itemprop='price']", ".prices .price", ".list-price"]
+                
+                prices_found = []
+                for sel in price_selectors:
+                    els = driver.find_elements(By.CSS_SELECTOR, sel)
+                    for el in els:
+                        if el.is_displayed():
+                            val = float(re.search(r'\$?([0-9]+\.[0-9]{2})', el.text).group(1))
+                            if 0 < val < 200:
+                                prices_found.append(val)
+                
+                if prices_found:
+                    # If we have a pro price, regular is likely the max of found prices?
+                    # Example: $69.99 (crossed) $17.50 (sale/pro)
+                    # If we found $16.62 as pro, $17.50 might be regular sale.
+                    # Let's take the MAX as regular price if multiple found?
+                    # Or the one that is NOT the pro price?
+                    
+                    max_p = max(prices_found)
+                    min_p = min(prices_found)
+                    
+                    if pro_price:
+                        # If we have a pro price, assume regular is the higher one
+                        regular_price = max_p if max_p > pro_price else pro_price
+                        # Wait, in WWE example: $17.50 is regular, $16.62 is pro.
+                        # If scraper found $17.50, we set regular to $17.50.
+                    else:
+                        regular_price = max_p # Default to highest (safest for discounts)
+                        
+                    print(f"Prices found: {prices_found}. Selected Regular: {regular_price}")
+            except:
+                pass
+                
+            # Fallback
+            if not regular_price:
+                html = driver.page_source
+                match = re.search(r'"sellingPrice":\s*"?([0-9]+\.[0-9]{2})"?', html)
+                if match:
+                    regular_price = float(match.group(1))
+
+            # Strategy 4: "5% extra off" Calculation
+            if not pro_price and regular_price:
+                page_text = driver.find_element(By.TAG_NAME, "body").text
+                if "Pros get 5% extra off" in page_text or "Save 5% on PreOwned" in page_text: 
+                    # Only apply if we haven't found a text mismatch
+                    print("Found 'Pros get 5% extra off' text. Calculating Pro Price.")
+                    pro_price = round(regular_price * 0.95, 2)
+            
+            # Logic Update: If Pro Price is scraped from Digital Tile ($16.62)
+            # And Regular Price is scraped from Main ($17.50)
+            # We are good.
+            
+            # If Regular Price is same as Pro Price, but we suspected a discount?
+            # Trust the explicit values.
+            
+            # Final sanity: Pro Price shouldn't be higher than regular
+            if pro_price and regular_price and pro_price > regular_price:
+                regular_price = pro_price # Swap or equalize? likely logic error, but assume regular is at least pro.
+                
+            if not pro_price and regular_price:
+                # If verified digital, assume regular is the price
+                pro_price = regular_price # No discount confirmed
+                pass
+
+            # Construct Result
+            final_live_price = pro_price if pro_price else regular_price
+            
+            return {
+                "status": "success",
+                "url": url,
+                "prices": {
+                    "regular": regular_price,
+                    "pro": pro_price
+                },
+                "livePrice": final_live_price, # Backward compatibilityish, but we prefer structured
+                "verifiedAt": datetime.now().isoformat(),
+                "note": "Split Regular/Pro extraction"
+            }
+
+ 
+             
+    # Fallback if loop exhausted (handled by return inside loop)
+    return {"status": "error", "message": "Verification failed after retries"}
+
 
 
 if __name__ == "__main__":
