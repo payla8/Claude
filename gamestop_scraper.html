@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -228,10 +229,21 @@
             color: white;
         }
 
-        .tab.xbox.active { background: var(--xbox); }
-        .tab.playstation.active { background: var(--playstation); }
-        .tab.nintendo.active { background: var(--nintendo); }
-        .tab.pc.active { background: var(--pc); }
+        .tab.xbox.active {
+            background: var(--xbox);
+        }
+
+        .tab.playstation.active {
+            background: var(--playstation);
+        }
+
+        .tab.nintendo.active {
+            background: var(--nintendo);
+        }
+
+        .tab.pc.active {
+            background: var(--pc);
+        }
 
         .stats-bar {
             display: flex;
@@ -366,11 +378,25 @@
             text-transform: uppercase;
         }
 
-        .platform-Xbox { background: var(--xbox); }
-        .platform-PlayStation { background: var(--playstation); }
-        .platform-Nintendo { background: var(--nintendo); }
-        .platform-PC { background: var(--pc); }
-        .platform-Other { background: var(--border); }
+        .platform-Xbox {
+            background: var(--xbox);
+        }
+
+        .platform-PlayStation {
+            background: var(--playstation);
+        }
+
+        .platform-Nintendo {
+            background: var(--nintendo);
+        }
+
+        .platform-PC {
+            background: var(--pc);
+        }
+
+        .platform-Other {
+            background: var(--border);
+        }
 
         .price {
             font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
@@ -403,7 +429,9 @@
         }
 
         @keyframes spin {
-            to { transform: rotate(360deg); }
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         .progress-bar {
@@ -475,7 +503,8 @@
             text-decoration: underline;
         }
 
-        .aks-add, .aks-edit {
+        .aks-add,
+        .aks-edit {
             background: var(--bg-input);
             border: 1px solid var(--border);
             border-radius: 4px;
@@ -485,7 +514,8 @@
             font-size: 11px;
         }
 
-        .aks-add:hover, .aks-edit:hover {
+        .aks-add:hover,
+        .aks-edit:hover {
             background: var(--border);
             color: var(--text);
         }
@@ -573,6 +603,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="header">
         <h1>GameStop Digital Products Scraper</h1>
@@ -583,7 +614,8 @@
         <div class="settings-panel">
             <div class="setting-group">
                 <label>API Server URL</label>
-                <input type="text" id="apiUrl" value="http://localhost:8000" placeholder="http://localhost:8000">
+                <input type="text" id="apiUrl" value="https://gamestop-0ib7.onrender.com"
+                    placeholder="https://gamestop-0ib7.onrender.com">
             </div>
 
             <div class="setting-group">
@@ -596,7 +628,8 @@
                 <div class="rate-display">
                     <span class="rate-value" id="exchangeRate">0.92</span>
                     <span class="rate-label">Live</span>
-                    <button class="btn btn-secondary" onclick="refreshExchangeRate()" style="padding: 8px 12px; font-size: 12px;">
+                    <button class="btn btn-secondary" onclick="refreshExchangeRate()"
+                        style="padding: 8px 12px; font-size: 12px;">
                         ↻ Refresh
                     </button>
                 </div>
@@ -623,16 +656,20 @@
         <div class="tabs">
             <button class="tab active" data-platform="all" onclick="filterPlatform('all', this)">All Platforms</button>
             <button class="tab xbox" data-platform="Xbox" onclick="filterPlatform('Xbox', this)">Xbox</button>
-            <button class="tab nintendo" data-platform="Nintendo" onclick="filterPlatform('Nintendo', this)">Nintendo</button>
+            <button class="tab nintendo" data-platform="Nintendo"
+                onclick="filterPlatform('Nintendo', this)">Nintendo</button>
             <button class="tab pc" data-platform="PC" onclick="filterPlatform('PC', this)">PC</button>
         </div>
 
-        <div class="warning-banner" style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); border-left: 4px solid #4ade80;">
+        <div class="warning-banner"
+            style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); border-left: 4px solid #4ade80;">
             <div class="warning-banner-icon">✓</div>
             <div class="warning-banner-content">
                 <div class="warning-banner-title">Real-Time Accurate Prices</div>
                 <div class="warning-banner-text">
-                    Prices are fetched in REAL-TIME from GameStop's official Constructor.io API. This is the same API GameStop.com uses - prices are updated hourly and are accurate. <strong>Always click product links to complete your purchase on GameStop.com.</strong>
+                    Prices are fetched in REAL-TIME from GameStop's official Constructor.io API. This is the same API
+                    GameStop.com uses - prices are updated hourly and are accurate. <strong>Always click product links
+                        to complete your purchase on GameStop.com.</strong>
                 </div>
             </div>
         </div>
@@ -701,11 +738,13 @@
         <div class="modal">
             <h3 id="aksModalTitle">Add AllKeyShop Link</h3>
             <p style="color: var(--text-muted); margin-bottom: 15px; font-size: 13px;" id="aksProductName"></p>
-            <input type="text" id="aksUrlInput" placeholder="Paste AllKeyShop URL here (e.g., https://www.allkeyshop.com/blog/buy-...)">
+            <input type="text" id="aksUrlInput"
+                placeholder="Paste AllKeyShop URL here (e.g., https://www.allkeyshop.com/blog/buy-...)">
             <div style="display: flex; gap: 10px; margin-bottom: 15px;">
                 <div style="flex: 1;">
                     <label style="font-size: 11px; color: var(--text-muted);">Edition Filter</label>
-                    <select id="aksEditionFilter" style="width: 100%; margin-top: 5px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; padding: 10px; color: var(--text);">
+                    <select id="aksEditionFilter"
+                        style="width: 100%; margin-top: 5px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; padding: 10px; color: var(--text);">
                         <option value="">All Editions</option>
                         <option value="standard">Standard</option>
                         <option value="ultimate">Ultimate</option>
@@ -713,7 +752,8 @@
                 </div>
                 <div style="flex: 1;">
                     <label style="font-size: 11px; color: var(--text-muted);">Region Filter</label>
-                    <select id="aksRegionFilter" style="width: 100%; margin-top: 5px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; padding: 10px; color: var(--text);">
+                    <select id="aksRegionFilter"
+                        style="width: 100%; margin-top: 5px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; padding: 10px; color: var(--text);">
                         <option value="">All Regions</option>
                         <option value="global">Global</option>
                         <option value="europe">Europe</option>
@@ -726,10 +766,12 @@
                     Keys only (exclude accounts)
                 </label>
             </div>
-            <div id="aksPriceResult" style="display: none; background: var(--bg-input); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+            <div id="aksPriceResult"
+                style="display: none; background: var(--bg-input); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <div>
-                        <div style="font-size: 24px; font-weight: 700; color: var(--success);" id="aksResultPrice">-</div>
+                        <div style="font-size: 24px; font-weight: 700; color: var(--success);" id="aksResultPrice">-
+                        </div>
                         <div style="font-size: 12px; color: var(--text-muted);" id="aksResultStore">-</div>
                     </div>
                     <div style="text-align: right;">
@@ -1033,13 +1075,13 @@
                     <td class="price price-cost">${p.yourCostEUR ? '€' + p.yourCostEUR.toFixed(2) : '-'}</td>
                     <td class="allkeyshop-cell">
                         ${p.allkeyshopUrl
-                            ? `${p.allkeyshopPrice
-                                ? `<span class="aks-price ${p.allkeyshopPrice < p.yourCostEUR ? 'aks-expensive' : 'aks-cheaper'}">€${p.allkeyshopPrice.toFixed(2)}</span> `
-                                : ''
-                              }<a href="${p.allkeyshopUrl}" target="_blank" class="aks-link" title="${p.allkeyshopUrl}">🔗</a>
+                    ? `${p.allkeyshopPrice
+                        ? `<span class="aks-price ${p.allkeyshopPrice < p.yourCostEUR ? 'aks-expensive' : 'aks-cheaper'}">€${p.allkeyshopPrice.toFixed(2)}</span> `
+                        : ''
+                    }<a href="${p.allkeyshopUrl}" target="_blank" class="aks-link" title="${p.allkeyshopUrl}">🔗</a>
                                <button class="aks-edit" onclick="editAllKeyShopLink('${p.sku}')" title="Edit">✏️</button>`
-                            : `<button class="aks-add" onclick="editAllKeyShopLink('${p.sku}')">+ Add</button>`
-                        }
+                    : `<button class="aks-add" onclick="editAllKeyShopLink('${p.sku}')">+ Add</button>`
+                }
                     </td>
                     <td>${p.availability || 'Unknown'}</td>
                 </tr>
@@ -1251,4 +1293,5 @@
         });
     </script>
 </body>
+
 </html>
