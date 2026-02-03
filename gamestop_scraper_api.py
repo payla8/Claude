@@ -14,15 +14,8 @@ import re
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import os
-import os
-import undetected_chromedriver as uc
-import asyncio
-from selenium.webdriver.common.by import By
 
 app = FastAPI(title="GameStop Scraper API", version="4.0.0")
-
-# Lock for browser access
-browser_lock = asyncio.Lock()
 
 # Enable CORS for frontend access
 app.add_middleware(
@@ -51,24 +44,7 @@ HEADERS = {
     "Accept": "application/json",
     "Origin": "https://www.gamestop.com",
     "Referer": "https://www.gamestop.com/",
-}
 
-# Chrome Driver instance
-driver = None
-
-def get_driver():
-    global driver
-    if driver is None:
-        print("Initializing Chrome Driver...")
-        options = uc.ChromeOptions()
-        options.add_argument('--incognito')
-        options.add_argument('--disable-blink-features=AutomationControlled')
-        # options.add_argument('--headless=new') # Headless often detects as bot, keep headful but minimized if possible
-        # User requested "real website", showing the browser might be reassuring or annoying. 
-        # Let's keep it visible for debug, user can minimize.
-        # options.add_argument('--start-minimized') 
-        driver = uc.Chrome(options=options)
-    return driver
 
 
 def detect_platform(product_name: str, product_id: str = "") -> str:
