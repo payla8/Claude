@@ -44,8 +44,7 @@ HEADERS = {
     "Accept": "application/json",
     "Origin": "https://www.gamestop.com",
     "Referer": "https://www.gamestop.com/",
-
-
+}
 
 def detect_platform(product_name: str, product_id: str = "") -> str:
     """Detect platform from product name using regex patterns"""
